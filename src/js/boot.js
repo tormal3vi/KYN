@@ -1,163 +1,149 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Boot sequence: a fake-but-honest startup log, typed out line by line.
+// The startup sequence, written as a terminal program.
 //
-// "Honest" means the numbers are real (CPU cores, screen, locale, hostname
-// from Rust) and the module lines reflect each module's real status from
-// config.js. The drama is in the timing, not in made-up claims.
+// It only ever does what a real terminal can do: put characters at a column
+// and row, in one of the colours from palette.js, and move a blinking cursor.
+// The same function runs inside the app (term-web.js draws it in the window)
+// and in your real terminal (npm run boot:cli), so both look identical.
 //
-// ctrl.fast = true  → finish the rest quickly (any key)
-// ctrl.skip = true  → finish instantly (Esc); main.js then jumps to the menu
+// A "term" is anything with:
+//   term.cols, term.rows               grid size in characters
+//   term.clear()                       blank the screen
+//   term.write(x, y, text, style)      print text at column x, row y
+//   term.cursor(x, y) / cursor(null)   show the red blinking "_" / hide it
+//   term.flush()                       push changes to the screen
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { APP, MODULES } from './config.js';
-import { reducedMotion } from './glitch.js';
+import { APP, BOOT_LINES } from './config.js';
+import { ART, TONE, LOGO_WIDTH, LOGO_HEIGHT } from './logo.js';
+import { logoStyle } from './palette.js';
 
-const MOD_LINE = {
-  ready: { tag: '[ OK ]', tagCls: 't-ok', word: 'online', wordCls: 't-ok' },
-  next: { tag: '[ OK ]', tagCls: 't-ok', word: 'staged · next build', wordCls: 't-warn' },
-  planned: { tag: '[ -- ]', tagCls: 't-dim', word: 'queued', wordCls: 't-dim' },
-  locked: { tag: '[ !! ]', tagCls: 't-mag', word: 'locked', wordCls: 't-mag' },
-};
+// Smallest grids the splash is designed for. The app picks a font size so the
+// window is at least one of these: wide (logo with name beside it) or tall
+// (name under the logo).
+export const GRID_MINIMUMS = [
+  { cols: 104, rows: 44 },
+  { cols: 74, rows: 50 },
+];
 
-function span(text, cls) {
-  const s = document.createElement('span');
-  if (cls) s.className = cls;
-  s.textContent = text; // textContent, never innerHTML: hostnames are data, not markup
-  return s;
+const wordmark = () => `[ ${APP.name} ]`;
+
+/** Where everything goes for a given grid size. */
+export function bootLayout(cols, rows) {
+  const word = wordmark();
+  const sideW = Math.max(word.length + 2, APP.tagline.length + 2);
+  const bootH = BOOT_LINES.length;
+  const boot = { x: 3, y: 1 };
+  const hint = { x: 3, y: rows - 2 };
+
+  // Wide: logo, with the name to its right at 60% of its height.
+  if (cols >= LOGO_WIDTH + 1 + sideW + 6 && rows >= bootH + LOGO_HEIGHT + 4) {
+    const lx = Math.max(3, Math.floor((cols - (LOGO_WIDTH + 1 + sideW)) / 2));
+    const ly = Math.max(bootH + 2, Math.floor((rows - LOGO_HEIGHT) / 2));
+    const wy = ly + Math.round(LOGO_HEIGHT * 0.61);
+    return {
+      boot, hint,
+      logo: { x: lx, y: ly },
+      word: { x: lx + LOGO_WIDTH + 1, y: wy },
+      tag: { x: lx + LOGO_WIDTH + 3, y: wy + 1 },
+    };
+  }
+
+  // Tall: logo centred, name centred underneath.
+  if (cols >= LOGO_WIDTH + 4 && rows >= bootH + LOGO_HEIGHT + 7) {
+    const spare = rows - (bootH + LOGO_HEIGHT + 7);
+    const ly = bootH + 2 + Math.floor(spare / 2);
+    const wy = ly + LOGO_HEIGHT + 1;
+    return {
+      boot, hint,
+      logo: { x: Math.floor((cols - LOGO_WIDTH) / 2), y: ly },
+      word: { x: Math.floor((cols - word.length - 2) / 2), y: wy },
+      tag: { x: Math.floor((cols - APP.tagline.length) / 2), y: wy + 1 },
+    };
+  }
+
+  // Too small for the logo: text only.
+  return { boot, hint, logo: null, word: { x: 3, y: bootH + 2 }, tag: { x: 5, y: bootH + 3 } };
 }
 
-export function createBootController() {
-  return { fast: reducedMotion, skip: false };
+/** Draw one row of the logo, skipping spaces so nothing behind gets erased. */
+function drawLogoRow(term, x, y, r) {
+  const row = ART[r];
+  let c = 0;
+  while (c < row.length) {
+    if (row[c] === ' ') { c++; continue; }
+    const style = logoStyle(row[c], TONE[r][c]);
+    let end = c + 1;
+    while (end < row.length && row[end] !== ' ' && logoStyle(row[end], TONE[r][end]) === style) end++;
+    term.write(x + c, y, row.slice(c, end), style);
+    c = end;
+  }
 }
 
-export async function runBoot(logEl, info, ctrl) {
-  logEl.textContent = '';
-  const cursor = span('', 'cursor');
+/**
+ * Play the startup. ctrl.fast = finish instantly (any key, or redrawing after
+ * a resize). ctrl.skip = same, and the caller jumps straight to the menu.
+ * `hint` is the text shown at the bottom once it's done.
+ */
+export async function runBoot(term, ctrl = {}, { hint = 'press any key' } = {}) {
+  const wait = (ms) => (ctrl.fast || ctrl.skip ? Promise.resolve() : new Promise((r) => setTimeout(r, ms)));
+  const L = bootLayout(term.cols, term.rows);
 
-  const wait = (ms) => {
-    const t = ctrl.skip ? 0 : ctrl.fast ? Math.min(ms, 10) : ms;
-    return new Promise((r) => setTimeout(r, t));
-  };
-  const jitter = (base, spread) => base + Math.random() * spread;
+  term.clear();
+  term.cursor(L.boot.x, L.boot.y);
+  term.flush();
+  await wait(600);
 
-  const addLine = (parts = []) => {
-    const line = document.createElement('div');
-    line.className = 'boot-line';
-    parts.forEach(([text, cls]) => line.append(span(text, cls)));
-    line.append(cursor);
-    logEl.append(line);
-    logEl.scrollTop = logEl.scrollHeight; // keep the newest line in view
-    return line;
-  };
-
-  const type = async (line, text, cls, speed = 34) => {
-    const s = span('', cls);
-    line.insertBefore(s, cursor);
-    for (const ch of text) {
-      if (ctrl.skip || ctrl.fast) break;
-      s.textContent += ch;
-      await wait(jitter(speed * 0.6, speed));
+  // 1. status lines: "[+] text" appears, then its "..." ticks in one dot at a time
+  for (let i = 0; i < BOOT_LINES.length; i++) {
+    const line = BOOT_LINES[i];
+    const last = i === BOOT_LINES.length - 1;
+    const style = last ? 'text' : 'gray';
+    const working = line.endsWith('...');
+    const head = working ? line.slice(0, -3) : line;
+    const y = L.boot.y + i;
+    term.write(L.boot.x, y, `[+] ${head}`, style);
+    let x = L.boot.x + 4 + head.length;
+    term.cursor(x, y);
+    term.flush();
+    if (working) {
+      for (let d = 0; d < 3; d++) {
+        await wait(220);
+        term.write(x, y, '.', style);
+        x += 1;
+        term.cursor(x, y);
+        term.flush();
+      }
     }
-    s.textContent = text;
-  };
-
-  // Kernel-style timestamps: [    0.003114]
-  let clock = 0;
-  const stamp = () => {
-    clock += jitter(0.002, 0.009);
-    return `[${clock.toFixed(6).padStart(12)}] `;
-  };
-
-  const now = new Date();
-  const pad2 = (n) => String(n).padStart(2, '0');
-  const dateStr = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
-
-  // ── 1. banner + typed command ────────────────────────────────────────────
-  await wait(350);
-  addLine([[`${APP.name} secure shell v${APP.version}`, 't-strong']]);
-  addLine([[`own-devices build · scope locked · ${dateStr}`, 't-dim']]);
-  addLine();
-  await wait(400);
-  const prompt = addLine([[`${APP.operator}@${APP.name.toLowerCase().replace(/\s+/g, '-')}`, 't-ok'], [':~$ ', 't-dim']]);
-  await wait(500);
-  await type(prompt, `./${APP.name.toLowerCase().replace(/\s+/g, '-')} --boot --scope=own-devices`, 't-strong');
-  await wait(380);
-
-  // ── 2. hardware / environment probe (real values) ────────────────────────
-  const probes = [
-    ['ghost-core: waking up', ''],
-    [`cpu: ${info.cores ?? '?'} logical cores online`, ''],
-    [`display: ${info.screen} @${info.dpr}x`, ''],
-    [`locale: ${info.locale} · ${info.tz}`, ''],
-    info.native
-      ? [`host: ${info.hostname} (${info.os} ${info.arch})`, 't-strong']
-      : ['bridge: no native shell (browser preview, Rust side not running)', 't-warn'],
-    [`link: ${info.online ? 'up' : 'down'}`, info.online ? '' : 't-warn'],
-  ];
-  for (const [text, cls] of probes) {
-    addLine([[stamp(), 't-dim'], [text, cls]]);
-    await wait(jitter(55, 90));
+    await wait(last ? 380 : 240);
   }
-  await wait(200);
 
-  // ── 3. services ──────────────────────────────────────────────────────────
-  const services = [
-    'mounted /dev/shadowfs',
-    'started entropy daemon',
-    'loaded scope policy → own devices only',
-    'reached target: operator console',
-  ];
-  for (const text of services) {
-    addLine([['[ OK ] ', 't-ok'], [text, '']]);
-    await wait(jitter(80, 110));
-  }
-  await wait(180);
-
-  // ── 4. modules (from config.js) ──────────────────────────────────────────
-  const nameWidth = Math.max(...MODULES.map((m) => m.cmd.length)) + 1;
-  for (const mod of MODULES) {
-    const style = MOD_LINE[mod.status] || MOD_LINE.planned;
-    const tag = span('[ .. ] ', 't-dim');
-    const line = addLine();
-    line.insertBefore(tag, cursor);
-    line.insertBefore(span(`module ${mod.cmd.padEnd(nameWidth)}`, ''), cursor);
-    const dots = span('', 't-faint');
-    line.insertBefore(dots, cursor);
-    for (let i = 0; i < 10; i++) {
-      dots.textContent += '.';
-      await wait(jitter(14, 20));
+  // 2. logo, printed top to bottom
+  term.cursor(null);
+  if (L.logo) {
+    for (let r = 0; r < LOGO_HEIGHT; r++) {
+      drawLogoRow(term, L.logo.x, L.logo.y + r, r);
+      term.flush();
+      await wait(24);
     }
-    await wait(jitter(60, 120));
-    tag.textContent = `${style.tag} `;
-    tag.className = style.tagCls;
-    line.insertBefore(span(` ${style.word}`, style.wordCls), cursor);
-    if (mod.bootNote) line.insertBefore(span(`  (${mod.bootNote})`, 't-dim'), cursor);
-    await wait(jitter(40, 60));
+    await wait(320);
   }
-  await wait(220);
 
-  // ── 5. progress bar ──────────────────────────────────────────────────────
-  const bar = span('', 't-ok');
-  const pct = span('', 't-strong');
-  const pLine = addLine([['decrypting interface  ', '']]);
-  pLine.insertBefore(span('[', 't-dim'), cursor);
-  pLine.insertBefore(bar, cursor);
-  pLine.insertBefore(span('] ', 't-dim'), cursor);
-  pLine.insertBefore(pct, cursor);
-  const cells = 24;
-  let p = 0;
-  while (p < 100) {
-    p = Math.min(100, p + Math.round(jitter(3, 14)));
-    const filled = Math.round((p / 100) * cells);
-    bar.textContent = '█'.repeat(filled) + '░'.repeat(cells - filled);
-    pct.textContent = `${String(p).padStart(3)}%`;
-    await wait(jitter(30, 70));
+  // 3. name + cursor, then the tagline types out
+  const word = wordmark();
+  term.write(L.word.x, L.word.y, word, 'strong');
+  term.cursor(L.word.x + word.length + 1, L.word.y);
+  term.flush();
+  await wait(450);
+  for (let i = 1; i <= APP.tagline.length; i++) {
+    term.write(L.tag.x, L.tag.y, APP.tagline.slice(0, i), 'muted');
+    term.flush();
+    await wait(28);
   }
-  await wait(250);
 
-  // ── 6. sign-off ──────────────────────────────────────────────────────────
-  addLine();
-  const bye = addLine([['> ', 't-ok']]);
-  await type(bye, `handshake complete. welcome back, ${APP.operator}.`, 't-ok', 26);
-  await wait(650);
+  await wait(700);
+  if (hint) {
+    term.write(L.hint.x, L.hint.y, hint, 'faint');
+    term.flush();
+  }
 }

@@ -1,5 +1,5 @@
 [package]
-name = "ghostline"
+name = "kyn"
 version = "0.1.0"
 description = "Defensive security toolkit for your own devices and network"
 edition = "2021"
@@ -7,7 +7,7 @@ edition = "2021"
 # The app's Rust code lives in a library (src/lib.rs) so the same code can be
 # reused later (tests, mobile). src/main.rs just calls into it.
 [lib]
-name = "ghostline_lib"
+name = "kyn_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

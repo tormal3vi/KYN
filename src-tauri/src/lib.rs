@@ -1,4 +1,4 @@
-//! GHOSTLINE native core.
+//! KYN native core.
 //!
 //! How the app is split:
 //! - The web UI in `../src` (HTML/CSS/JS) draws everything you see.

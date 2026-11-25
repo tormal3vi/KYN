@@ -1,31 +1,37 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// App identity and module list.
+// App identity, boot text and module list.
 //
-// To rename the app, change `name` here. The boot log, logo wordmark, window
-// title and menu all read from this file. (The native app name is also set in
-// src-tauri/tauri.conf.json, see README "Renaming the app".)
+// Everything you read on screen comes from here. To rename the app, change
+// `name` (the native app name is also in src-tauri/tauri.conf.json, see the
+// README section "Renaming the app").
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const APP = {
-  name: 'GHOSTLINE',          // letters, digits, spaces and - . _ / : ! ? render in the pixel logo
-  tagline: 'KNOW YOUR NETWORK',
+  name: 'KYN',
+  tagline: 'DECENTRALIZED BY NATURE.',
   version: '0.1.0',
-  operator: 'operator',       // the "user" shown in the fake shell prompt
+  command: 'kyn', // shown in the fake shell prompt: "$ kyn netmap"
 };
 
-// Module status drives the label, colour and boot-log line:
-//   ready   = built and usable
-//   next    = the one being built now
-//   planned = on the list
-//   locked  = later / needs hardware
+// The startup log. Lines ending in "..." animate their dots while "working".
+// The last line is printed brighter, as the result.
+export const BOOT_LINES = [
+  `Initializing ${APP.name} protocol...`,
+  'Establishing mesh network...',
+  'Verifying identity...',
+  'Connection successful.',
+];
+
+// Module status decides the label and colour in the menu:
+//   ready = built and usable · next = being built now
+//   planned = on the list    · locked = later / needs hardware
 export const MODULES = [
   {
     id: 'netmap',
     cmd: 'netmap',
     name: 'Network Map',
     status: 'next',
-    icon: 'netmap',
-    blurb: 'Scan your own local network and list every device: IP, MAC, vendor, online or not.',
+    blurb: 'Scan your own local network: every device with IP, MAC, vendor, online or not.',
     plan: [
       'Detect your subnet automatically (for example 192.168.1.0/24)',
       'Find every device that answers on your home network',
@@ -39,8 +45,7 @@ export const MODULES = [
     cmd: 'portaudit',
     name: 'Port Audit',
     status: 'planned',
-    icon: 'port',
-    blurb: 'Check which ports are open on your own machines and flag the risky ones in plain language.',
+    blurb: 'Open ports on your own machines, with the risky ones explained in plain language.',
     plan: [
       'Scan common ports on a machine you pick from your Network Map',
       'Explain what each open port is, in plain language',
@@ -52,8 +57,7 @@ export const MODULES = [
     cmd: 'watchdog',
     name: 'Watchdog',
     status: 'planned',
-    icon: 'pulse',
-    blurb: 'Keep an eye on services you run and raise an alert screen when one goes down.',
+    blurb: 'Ping the services you run and raise an alert when one goes down.',
     plan: [
       'Add your own services: a website URL or a host and port',
       'Check them on a timer and keep a short uptime history',
@@ -65,9 +69,7 @@ export const MODULES = [
     cmd: 'sim',
     name: 'Hack Sim',
     status: 'locked',
-    icon: 'game',
-    bootNote: 'offline game, no real targets',
-    blurb: 'Offline game: a made-up target network with simulated scans and node-cracking minigames.',
+    blurb: 'Offline game: a made-up network with simulated scans. No real targets.',
     plan: [
       'A fictional city network that exists only inside the app',
       'Simulated scans and exploits: no real packets ever leave your machine',
@@ -79,20 +81,18 @@ export const MODULES = [
     cmd: 'hwlink',
     name: 'Hardware Link',
     status: 'locked',
-    icon: 'chip',
-    bootNote: 'no device attached',
     blurb: 'Front-end for an ESP32 or Flipper Zero you own, tested on things you own.',
     plan: [
       'Talk to your own ESP32 or Flipper Zero over USB',
-      'Show sensor readings and logs in the GHOSTLINE interface',
+      'Show sensor readings and logs in the KYN interface',
       'Only hardware and devices that belong to you',
     ],
   },
 ];
 
-export const STATUS_LABEL = {
-  ready: 'ONLINE',
-  next: 'NEXT BUILD',
-  planned: 'PLANNED',
-  locked: 'LOCKED',
+export const STATUS = {
+  ready: { label: 'online', style: 'strong' },
+  next: { label: 'next', style: 'text' },
+  planned: { label: 'planned', style: 'gray' },
+  locked: { label: 'locked', style: 'faint' },
 };

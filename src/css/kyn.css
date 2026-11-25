@@ -1,0 +1,85 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   KYN: one black screen, one monospace grid.
+   Text colours come from js/palette.js (added as .s-* classes at startup),
+   so this file only sets up the font and the terminal surface.
+   ────────────────────────────────────────────────────────────────────────── */
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../fonts/JetBrainsMono-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: block;
+}
+
+:root {
+  color-scheme: dark;
+  background: #000;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: #000;
+}
+
+body { overflow: hidden; }
+
+#app {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+
+.term {
+  margin: 0;
+  overflow: hidden;
+  color: #e4e4e4;
+  font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 14px;
+  line-height: 18px;
+  white-space: pre;
+  /* terminals don't join characters into ligatures; neither do we */
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+  font-kerning: none;
+  -webkit-font-smoothing: antialiased;
+  cursor: default;
+}
+
+.term .r {
+  display: block;
+  height: var(--row-h, 18px);
+}
+
+.term.is-pointer { cursor: pointer; }
+
+/* the red "_" cursor blinks like a terminal cursor: 530ms on, 530ms off */
+.term .cursor { animation: blink 1.06s steps(1, end) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.fatal {
+  position: fixed;
+  inset: auto 16px 16px 16px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #d75f5f;
+  background: #000;
+  color: #d75f5f;
+  white-space: pre-wrap;
+  font: 12px/1.4 ui-monospace, Menlo, monospace;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .term .cursor { animation: none; }
+}

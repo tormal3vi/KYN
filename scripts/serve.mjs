@@ -36,5 +36,5 @@ createServer(async (req, res) => {
     res.writeHead(404).end('not found');
   }
 }).listen(port, '127.0.0.1', () => {
-  console.log(`GHOSTLINE preview → http://localhost:${port}  (Ctrl+C to stop)`);
+  console.log(`KYN preview → http://localhost:${port}  (Ctrl+C to stop)`);
 });

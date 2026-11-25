@@ -1,4 +1,4 @@
-# Setting up GHOSTLINE on a Mac
+# Setting up KYN on a Mac
 
 This gets you from a fresh Mac to the app running in a window. It takes about
 20–30 minutes, most of it waiting for downloads and the first compile. Works the
@@ -66,11 +66,11 @@ mkdir -p ~/Projects && cd ~/Projects
 ```
 
 ```bash
-git clone https://github.com/tormal3vi/KYN.git ghostline
+git clone https://github.com/tormal3vi/KYN.git kyn
 ```
 
 ```bash
-cd ghostline
+cd kyn
 ```
 
 Until this work is merged into the main branch, switch to the branch it lives on:
@@ -103,7 +103,7 @@ The **first run is slow, around 3–10 minutes**, because Rust compiles all of
 Tauri's libraries once. You'll see a long list of `Compiling ...` lines. Later
 runs start in seconds.
 
-When it finishes, a GHOSTLINE window opens and boots. Leave the Terminal
+When it finishes, a KYN window opens and runs its startup. Leave the Terminal
 running; it's the app's log.
 
 - **Edit anything in `src/`** (HTML, CSS, JS) → the window reloads by itself.
@@ -112,9 +112,20 @@ running; it's the app's log.
 - **See errors in the UI**: right-click in the window → **Inspect Element** →
   **Console** tab. (Only available in dev mode.)
 
-In the app: any key fast-forwards the boot, `Esc` skips straight to the menu.
+In the app: any key finishes the startup, `Esc` skips straight to the menu.
 
-## 7. (Optional) Preview in a normal browser
+## 7. (Optional) The same startup in Terminal
+
+KYN's startup is written as a terminal program, so you can also run it in
+the Terminal itself. Make the window big first (full screen works best):
+
+```bash
+npm run boot:cli
+```
+
+Any key exits. If the window is too small for the logo, it shows text only.
+
+## 8. (Optional) Preview in a normal browser
 
 Faster for tweaking the look, because no Rust is involved:
 
@@ -122,10 +133,10 @@ Faster for tweaking the look, because no Rust is involved:
 npm run preview
 ```
 
-Open <http://localhost:5173>. The boot log will say "browser preview" instead
-of your Mac's hostname, because the Rust side isn't running.
+Open <http://localhost:5173>. The menu will say "browser preview" instead of
+your Mac's hostname, because the Rust side isn't running.
 
-## 8. (Optional) Build a real `.app`
+## 9. (Optional) Build a real `.app`
 
 ```bash
 npm run build
@@ -133,8 +144,8 @@ npm run build
 
 When it's done you get:
 
-- `src-tauri/target/release/bundle/macos/GHOSTLINE.app`: drag it to Applications
-- `src-tauri/target/release/bundle/dmg/GHOSTLINE_0.1.0_aarch64.dmg`: an installer
+- `src-tauri/target/release/bundle/macos/KYN.app`: drag it to Applications
+- `src-tauri/target/release/bundle/dmg/KYN_0.1.0_aarch64.dmg`: an installer
   image (`x64` instead of `aarch64` on Intel Macs)
 
 Because you built it on your own Mac, it opens normally. If you copy it to

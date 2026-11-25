@@ -1,140 +1,64 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Entry point. Runs the screens in order:
-//   boot log  →  CRT glitch-out  →  logo reveal  →  module menu
+// Entry point:  startup (boot.js)  →  wait for a key  →  module menu (menu.js)
 //
-// Keys during boot: any key = fast-forward, Esc = skip straight to the menu.
-// On the logo: any key or click continues.
+// During startup: any key = finish instantly, Esc = skip straight to the menu.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { APP } from './config.js';
-import { MARK, pixelSvg, textRows } from './pixel.js';
-import { mountGlitch, burst, idleGlitch, reducedMotion } from './glitch.js';
+import { GRID_MINIMUMS, runBoot } from './boot.js';
+import { createWebTerminal } from './term-web.js';
 import { getSystemInfo } from './sysinfo.js';
-import { createBootController, runBoot } from './boot.js';
-import { initMenu } from './menu.js';
-
-const $ = (sel) => document.querySelector(sel);
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+import { createMenu } from './menu.js';
 
 document.title = APP.name;
 
-const ctrl = createBootController();
-let current = 'boot';
-let menu = null;
-let wake = null; // resolves the current "wait for key or timeout"
+let state = 'boot'; // boot → splash → menu
+const ctrl = { fast: false, skip: false };
+let continueFromSplash = null;
 
-/** Wait `ms`, or less if the user presses a key / clicks. */
-function waitOrInput(ms) {
-  return new Promise((resolve) => {
-    const t = setTimeout(done, ms);
-    function done() {
-      clearTimeout(t);
-      wake = null;
-      resolve();
-    }
-    wake = done;
+async function start() {
+  const term = await createWebTerminal(document.getElementById('app'), { minimums: GRID_MINIMUMS });
+  const info = await getSystemInfo();
+  const menu = createMenu(term, info);
+
+  // Resizing the window changes the grid, so redraw the current screen.
+  term.onResize(() => {
+    if (state === 'boot') ctrl.fast = true; // finish now; the final frame is redrawn below
+    else if (state === 'splash') runBoot(term, { fast: true });
+    else menu.draw();
   });
-}
 
-/** Play the CRT "switch-off" glitch on a screen, then hide it. */
-async function glitchOut(el) {
-  if (!reducedMotion) {
-    el.classList.add('is-glitching-out');
-    await sleep(520);
+  document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return; // leave Cmd+R, Cmd+Q etc. alone
+    if (state === 'boot') {
+      if (e.key === 'Escape') ctrl.skip = true;
+      else ctrl.fast = true;
+    } else if (state === 'splash') {
+      continueFromSplash?.();
+    } else {
+      menu.handleKey(e);
+    }
+  });
+  document.addEventListener('pointerdown', () => {
+    if (state === 'boot') ctrl.fast = true;
+    else if (state === 'splash') continueFromSplash?.();
+  });
+
+  await runBoot(term, ctrl);
+  if (!ctrl.skip) {
+    if (ctrl.fast) await runBoot(term, { fast: true }); // clean final frame at the current size
+    state = 'splash';
+    await new Promise((resolve) => { continueFromSplash = resolve; });
   }
-  el.hidden = true;
-  el.classList.remove('is-glitching-out');
-}
-
-async function typeInto(el, text, speed = 28) {
-  el.textContent = '';
-  for (const ch of text) {
-    if (reducedMotion) break;
-    el.textContent += ch;
-    await sleep(speed);
-  }
-  el.textContent = text;
-}
-
-async function showLogo() {
-  current = 'logo';
-  const screen = $('#screen-logo');
-  const mark = $('#logo-mark');
-  const word = $('#logo-word');
-  screen.hidden = false;
-
-  mountGlitch(mark, pixelSvg(MARK, { label: `${APP.name} logo` }), { resolve: true });
-  mountGlitch(word, pixelSvg(textRows(APP.name), { label: APP.name }), { resolve: true });
-  burst(mark, 1100, 1.8);
-  burst(word, 1100, 1.8);
-
-  let skipped = false;
-  const skipNow = () => { skipped = true; };
-  wake = skipNow;
-
-  await sleep(reducedMotion ? 0 : 1250);
-  if (!skipped) {
-    await typeInto($('#logo-tagline'), `// ${APP.tagline}`);
-    $('#logo-meta').textContent = `v${APP.version} · own devices only`;
-    $('#logo-continue').hidden = false;
-    const stopMark = idleGlitch(mark, { min: 900, max: 2600, strength: 1.2 });
-    const stopWord = idleGlitch(word, { min: 1400, max: 3400, strength: 1.2 });
-    await waitOrInput(7000);
-    stopMark();
-    stopWord();
-  }
-  wake = null;
-  await Promise.all([burst(mark, 260, 2.2), burst(word, 260, 2.2)]);
-  await glitchOut(screen);
-}
-
-function showMenu() {
-  current = 'menu';
-  $('#screen-boot').hidden = true;
-  $('#screen-logo').hidden = true;
+  state = 'menu';
   menu.show();
 }
 
-// ── input routing ──────────────────────────────────────────────────────────
-document.addEventListener('keydown', (e) => {
-  if (e.metaKey || e.ctrlKey || e.altKey) return; // leave Cmd+R, Cmd+Q etc. alone
-  if (current === 'boot') {
-    if (e.key === 'Escape') ctrl.skip = true;
-    else ctrl.fast = true;
-  } else if (current === 'logo') {
-    wake?.();
-  } else if (current === 'menu') {
-    menu.handleKey(e);
-  }
-});
-
-document.addEventListener('pointerdown', (e) => {
-  if (current === 'boot' && !e.target.closest('#boot-skip')) ctrl.fast = true;
-  else if (current === 'logo') wake?.();
-});
-
-$('#boot-skip').addEventListener('click', () => {
-  ctrl.skip = true;
-});
-
-// ── go ─────────────────────────────────────────────────────────────────────
-async function start() {
-  const info = await getSystemInfo();
-  menu = initMenu(info);
-
-  await runBoot($('#boot-log'), info, ctrl);
-  if (!ctrl.skip) {
-    await glitchOut($('#screen-boot'));
-    await showLogo();
-  }
-  showMenu();
-}
-
 start().catch((err) => {
-  // If something breaks, show it on screen rather than leaving a black window.
+  // Show errors on screen instead of leaving a black window.
   const pre = document.createElement('pre');
   pre.className = 'fatal';
-  pre.textContent = `boot failure:\n${err?.stack || err}`;
+  pre.textContent = `startup failed:\n${err?.stack || err}`;
   document.body.append(pre);
   console.error(err);
 });
