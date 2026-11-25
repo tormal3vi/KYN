@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>GHOSTLINE</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/boot.css">
+  <link rel="stylesheet" href="css/logo.css">
+  <link rel="stylesheet" href="css/menu.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <main id="app">
+
+    <!-- 1. Boot log ─────────────────────────────────────────────────────── -->
+    <section id="screen-boot" class="screen screen--boot" aria-label="Boot sequence">
+      <div id="boot-log" class="boot-log"></div>
+      <button type="button" id="boot-skip" class="boot-skip"><kbd>esc</kbd> skip · any key to fast-forward</button>
+    </section>
+
+    <!-- 2. Logo reveal ──────────────────────────────────────────────────── -->
+    <section id="screen-logo" class="screen screen--logo" hidden>
+      <div class="logo-wrap">
+        <div id="logo-mark" class="logo-mark"></div>
+        <div id="logo-word" class="logo-word"></div>
+        <p id="logo-tagline" class="logo-tagline"></p>
+        <p id="logo-meta" class="logo-meta"></p>
+        <p id="logo-continue" class="logo-continue" hidden>[ press any key ]</p>
+      </div>
+    </section>
+
+    <!-- 3. Module menu ──────────────────────────────────────────────────── -->
+    <section id="screen-menu" class="screen screen--menu" hidden>
+      <header class="topbar">
+        <div class="brand">
+          <div id="brand-mark" class="brand-mark"></div>
+          <div id="brand-word" class="brand-word"></div>
+        </div>
+        <div class="topbar-status">
+          <span class="chip chip--scope">scope: own devices</span>
+          <span id="st-link">LINK UP</span>
+          <span id="st-clock" class="t-strong">00:00:00</span>
+        </div>
+      </header>
+
+      <div class="menu-body">
+        <div class="menu-main">
+          <div id="menu-list-wrap">
+            <h1 class="menu-title"><span id="menu-prompt" class="t-ok">operator</span><span class="t-dim">:~$ </span>select module<span class="cursor"></span></h1>
+            <ol id="module-list" class="module-list" aria-label="Modules"></ol>
+          </div>
+          <div id="module-view" class="module-view" hidden></div>
+        </div>
+
+        <aside class="ops-panel" aria-label="Operator node">
+          <div id="ops-mark" class="ops-mark"></div>
+          <h2 class="ops-title">operator node</h2>
+          <dl id="ops-info" class="ops-info"></dl>
+          <div class="policy">
+            <p class="policy-head">scope policy</p>
+            <p>Own devices and own network only. No traffic interception, no Wi-Fi attacks, no third-party targets.</p>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="keybar">
+        <span><kbd>↑</kbd><kbd>↓</kbd> select</span>
+        <span><kbd>enter</kbd> open</span>
+        <span><kbd>1</kbd>–<kbd>5</kbd> jump</span>
+        <span><kbd>esc</kbd> back</span>
+        <span id="keybar-version" class="keybar-version"></span>
+      </footer>
+    </section>
+
+  </main>
+
+  <!-- CRT scanlines + vignette, drawn over everything, ignores clicks -->
+  <div class="crt" aria-hidden="true"></div>
+</body>
+</html>

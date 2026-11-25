@@ -1,0 +1,55 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Boot screen: the typed startup log and the CRT switch-off transition.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.screen--boot {
+  display: flex;
+  flex-direction: column;
+  padding-top: max(28px, 4vh, env(safe-area-inset-top, 0px));
+  padding-bottom: 56px;
+  overflow: hidden;
+}
+
+.boot-log {
+  flex: 1;
+  overflow: hidden;
+  font-size: clamp(12px, 1.25vw, 15px);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-shadow: 0 0 6px rgba(0, 245, 212, 0.25);
+  max-width: 1100px;
+}
+
+.boot-line { min-height: 1.6em; }
+
+.boot-skip {
+  position: absolute;
+  right: max(var(--gutter), env(safe-area-inset-right, 0px));
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--ink-faint);
+  font-size: 12px;
+  cursor: pointer;
+}
+.boot-skip:hover, .boot-skip:focus-visible { color: var(--ink); outline: none; }
+
+/* Switch-off: tear, split, collapse to a line, gone. Used on boot and logo. */
+.screen.is-glitching-out {
+  animation: crt-off 520ms steps(1, end) forwards;
+  text-shadow: -3px 0 var(--magenta), 3px 0 var(--yellow);
+}
+@keyframes crt-off {
+  0%   { transform: none; clip-path: inset(0); filter: brightness(1); }
+  10%  { transform: translate(-8px, 2px); clip-path: inset(8% 0 58% 0); }
+  20%  { transform: translate(10px, -3px) skewX(6deg); clip-path: inset(44% 0 18% 0); }
+  30%  { transform: translate(-4px, 0); clip-path: inset(70% 0 6% 0); filter: brightness(1.8); }
+  40%  { transform: translate(6px, 1px); clip-path: inset(0 0 82% 0); }
+  50%  { transform: none; clip-path: inset(0); filter: brightness(2.2); }
+  62%  { transform: scale(1, 0.04); filter: brightness(3); }
+  80%  { transform: scale(0.6, 0.006); filter: brightness(4); }
+  92%  { transform: scale(0.02, 0.006); }
+  100% { transform: scale(0, 0); opacity: 0; }
+}
