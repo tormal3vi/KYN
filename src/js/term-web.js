@@ -49,16 +49,17 @@ async function fontsReady() {
   } catch { /* fall back to the system monospace font */ }
 }
 
-/** Draw one logo cell as a small shape, in the style of the KYN artwork. */
+/** Add one logo cell's shape to the current path, in the style of the KYN
+ *  artwork. All cells of one colour are then filled in a single call. */
 function drawGlyph(ctx, g, x, y, w, h) {
   switch (g) {
-    case 'M': { const p = Math.max(0.6, w * 0.1); ctx.fillRect(x + p, y + p, w - 2 * p, h - 2 * p); break; }
-    case '-': ctx.fillRect(x, y + h * 0.42, w, Math.max(1, h * 0.18)); break;
-    case '=': ctx.fillRect(x, y + h * 0.2, w, Math.max(1, h * 0.16)); ctx.fillRect(x, y + h * 0.62, w, Math.max(1, h * 0.16)); break;
-    case '|': ctx.fillRect(x + w * 0.4, y, Math.max(1, w * 0.2), h); break;
-    case '+': ctx.fillRect(x + w * 0.1, y + h * 0.42, w * 0.8, Math.max(1, h * 0.16)); ctx.fillRect(x + w * 0.42, y + h * 0.1, Math.max(1, w * 0.16), h * 0.8); break;
-    case '.': ctx.fillRect(x + w * 0.32, y + h * 0.32, w * 0.36, h * 0.36); break;
-    case ':': ctx.fillRect(x + w * 0.35, y + h * 0.1, w * 0.3, h * 0.28); ctx.fillRect(x + w * 0.35, y + h * 0.62, w * 0.3, h * 0.28); break;
+    case 'M': { const p = Math.max(0.6, w * 0.1); ctx.rect(x + p, y + p, w - 2 * p, h - 2 * p); break; }
+    case '-': ctx.rect(x, y + h * 0.42, w, Math.max(1, h * 0.18)); break;
+    case '=': ctx.rect(x, y + h * 0.2, w, Math.max(1, h * 0.16)); ctx.rect(x, y + h * 0.62, w, Math.max(1, h * 0.16)); break;
+    case '|': ctx.rect(x + w * 0.4, y, Math.max(1, w * 0.2), h); break;
+    case '+': ctx.rect(x + w * 0.1, y + h * 0.42, w * 0.8, Math.max(1, h * 0.16)); ctx.rect(x + w * 0.42, y + h * 0.1, Math.max(1, w * 0.16), h * 0.8); break;
+    case '.': ctx.rect(x + w * 0.32, y + h * 0.32, w * 0.36, h * 0.36); break;
+    case ':': ctx.rect(x + w * 0.35, y + h * 0.1, w * 0.3, h * 0.28); ctx.rect(x + w * 0.35, y + h * 0.62, w * 0.3, h * 0.28); break;
     default: break;
   }
 }
@@ -239,7 +240,9 @@ export async function createWebTerminal(host, { minimums }) {
         buckets.forEach((cells, t) => {
           if (!cells.length) return;
           ctx.fillStyle = colors[t];
+          ctx.beginPath();
           for (const i of cells) drawGlyph(ctx, glyph[i], (i % cols) * cw, Math.floor(i / cols) * ch, cw, ch);
+          ctx.fill(); // overlapping parts of '+' stay filled (nonzero rule)
         });
       },
     };

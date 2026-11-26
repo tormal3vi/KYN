@@ -141,6 +141,7 @@ export function createPortaudit(term, { paintHeader, onExit }) {
       res.open.forEach((p) => check.open.add(p));
       check.millis = res.millis;
       check.cancelled = res.cancelled;
+      check.tally = res.tally || null;
       check.progress = { done: res.scanned, total: check.progress.total, open: res.open.length };
     } catch (e) {
       check.error = String(e?.message || e);
@@ -179,9 +180,12 @@ export function createPortaudit(term, { paintHeader, onExit }) {
       const kind = check.full ? 'full check' : 'quick check';
       const secs = (check.millis / 1000).toFixed(1);
       const stop = check.cancelled ? ' · stopped early' : '';
+      const t = check.tally;
+      const how = t ? ` · ${t.open} open · ${t.closed.toLocaleString('en')} closed · ${(t.silent + t.blocked).toLocaleString('en')} no answer` : '';
+      const text = `${kind} · ${p.done.toLocaleString('en')} ports · ${secs} s${stop}${how}`;
       term.write(X, y, '[+] ', 'gray');
-      term.write(X + 4, y, `${kind} · ${p.done.toLocaleString('en')} ports · ${secs} s${stop}`, 'muted');
-      if (api.isDemo) term.write(X + 4 + `${kind} · ${p.done.toLocaleString('en')} ports · ${secs} s${stop}`.length, y, ' · demo data (browser preview)', 'faint');
+      term.write(X + 4, y, fit(text, term.cols - X * 2 - 4), 'muted');
+      if (api.isDemo && X + 4 + text.length + 31 < term.cols) term.write(X + 4 + text.length, y, ' · demo data (browser preview)', 'faint');
     }
     if (flush) term.flush();
   }
@@ -195,7 +199,13 @@ export function createPortaudit(term, { paintHeader, onExit }) {
     const plural = (k, word) => `${k} ${word}${k === 1 ? '' : 's'}`;
     let x = X;
     const put = (s, st) => { term.write(x, y, s, st); x += s.length; };
-    if (!findings.length) {
+    const why = silence();
+    if (!findings.length && why === 'blocked') {
+      put('[!] this computer couldn\'t reach the device at all', 'red');
+    } else if (!findings.length && why === 'silent') {
+      put('[~] ', 'strong');
+      put('the device didn\'t answer at all', 'strong');
+    } else if (!findings.length) {
       put('[+] ', 'gray');
       put(check.full ? 'no open ports at all' : 'none of the common ports are open', 'text');
     } else if (high) {
@@ -215,6 +225,33 @@ export function createPortaudit(term, { paintHeader, onExit }) {
       else put(x + long.length <= term.cols - X ? long : '   · firewall OFF', 'red');
     }
   }
+
+  /** Nothing open: was it shut, quiet, or never reached? null = normal answer. */
+  function silence() {
+    const t = check?.tally;
+    if (!t || t.open) return null;
+    const total = t.closed + t.silent + t.blocked;
+    if (!total) return null;
+    if (t.blocked >= total / 2) return 'blocked';
+    if (t.closed === 0) return 'silent';
+    return null;
+  }
+
+  const SILENCE_HELP = {
+    blocked: (onMac) => (onMac ? [
+      'Every knock failed before it left this computer ("no route to host").',
+      'Most likely macOS is blocking KYN from your local network. Open System Settings → Privacy & Security → Local Network and switch on KYN (or Terminal, if you started KYN with npm run dev). Then press r.',
+      'Network Map can still list devices without this permission, because it also reads what your Mac already knows about the network.',
+    ] : [
+      'Every knock failed before it left this computer ("no route to host").',
+      'The device may have left the network, or a VPN or firewall on this computer is in the way. Check it is online in Network Map, then press r.',
+    ]),
+    silent: () => [
+      'Not a single port answered, not even with "closed".',
+      'Either the device is asleep or offline (phones and laptops nap a lot), or its firewall quietly ignores everything. That second one is good for security, but it means KYN can\'t see inside.',
+      'Wake the device up and press r to check again.',
+    ],
+  };
 
   function paintDevices() {
     term.write(X, 5, '[+] pick a device to check', 'gray');
@@ -249,6 +286,15 @@ export function createPortaudit(term, { paintHeader, onExit }) {
     const y0 = 9;
     if (check.scanning && !findings.length) {
       term.write(x0, y0, 'knocking...', 'faint');
+      return;
+    }
+    const why = !check.scanning && !findings.length && silence();
+    if (why) {
+      let row = y0;
+      for (const para of SILENCE_HELP[why](navigator.platform.startsWith('Mac') || check.local?.os === 'macos')) {
+        wrap(para, Math.min(w, 90)).forEach((l) => term.write(x0, row++, l, 'muted'));
+        row++;
+      }
       return;
     }
     term.write(x0, y0 - 1, fit(target.isSelf ? '   risk    port   what                      app' : '   risk    port   what', w), 'faint');

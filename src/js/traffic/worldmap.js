@@ -24,6 +24,8 @@ const TOP_LAT = 80;
 const BOTTOM_LAT = -58;
 const TAU = Math.PI * 2;
 const RADIUS = { city: 50, region: 200 }; // km, matches src-tauri/src/traffic/geo.rs
+const PINGS = 3;
+const PING_MS = 2600;
 
 const rad = (deg) => (deg * Math.PI) / 180;
 const mercY = (lat) => Math.log(Math.tan(Math.PI / 4 + rad(Math.max(-85, Math.min(85, lat))) / 2));
@@ -39,6 +41,35 @@ export function loadWorld() {
     .then(unpack)
     .catch((e) => { worldPromise = null; throw e; });
   return worldPromise;
+}
+
+// Simpler outlines for zoomed-out views: drawing a whole coastline point by
+// point when one map cell covers 50 km of it is wasted work. Tolerances in
+// mercator units (0.0012 ≈ 8 km at the equator).
+const LOD_TOL = [0, 0.0012, 0.005, 0.02];
+
+/** Drop points closer than `tol` to the last kept one. null if nothing is left. */
+function simplify(pts, tol, closed) {
+  if (!tol) return pts;
+  const out = [pts[0], pts[1]];
+  let lx = pts[0];
+  let ly = pts[1];
+  const t2 = tol * tol;
+  for (let i = 2; i < pts.length - 2; i += 2) {
+    const dx = pts[i] - lx;
+    const dy = pts[i + 1] - ly;
+    if (dx * dx + dy * dy >= t2) { out.push(pts[i], pts[i + 1]); lx = pts[i]; ly = pts[i + 1]; }
+  }
+  out.push(pts[pts.length - 2], pts[pts.length - 1]);
+  if (closed && out.length < 8) return null; // an island smaller than one map cell
+  return Float32Array.from(out);
+}
+
+/** The outline detail to use at `s` cells per mercator unit. */
+function lodFor(s) {
+  let level = 0;
+  for (let i = 1; i < LOD_TOL.length; i++) if (LOD_TOL[i] <= 0.5 / s) level = i;
+  return level;
 }
 
 /** TopoJSON → countries made of rings in mercator units, plus border lines. */
@@ -75,12 +106,14 @@ function unpack(topo) {
     const shapes = g.type === 'Polygon' ? [g.arcs] : g.type === 'MultiPolygon' ? g.arcs : [];
     const polys = shapes.map((rings) => {
       const rs = rings.map(ring);
-      return { rings: rs, box: bounds(rs[0]) };
+      const lod = LOD_TOL.map((tol) => rs.map((r) => simplify(r, tol, true)).filter(Boolean));
+      return { rings: rs, lod, box: bounds(rs[0]) };
     });
     return { id: g.id || null, name: g.properties?.name || '', polys, box: union(polys.map((p) => p.box)) };
   });
   // a line used by two countries is a border between them (the rest is coast)
-  const borders = arcs.filter((_, i) => used[i] > 1).map((a) => ({ line: a, box: bounds(a) }));
+  const borders = arcs.filter((_, i) => used[i] > 1)
+    .map((a) => ({ lod: LOD_TOL.map((tol) => simplify(a, tol, false)), box: bounds(a) }));
   return { countries, borders };
 }
 
@@ -216,6 +249,7 @@ export function createWorldMap() {
     const overlaps = (b, dx) => b[2] + dx >= view[0] && b[0] + dx <= view[2] && b[3] >= view[1] && b[1] <= view[3];
     const shifts = [-TAU, 0, TAU].filter((dx) => view[0] < -Math.PI + dx + TAU && view[2] > -Math.PI + dx);
     const litSet = lit;
+    const level = lodFor(v.s);
     const trace = (pts) => {
       ctx.moveTo(pts[0], pts[1]);
       for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
@@ -226,7 +260,7 @@ export function createWorldMap() {
         ctx.beginPath();
         for (const c of world.countries) {
           if ((c === spec.country || litSet.has(c)) !== lit || !overlaps(c.box, dx)) continue;
-          for (const p of c.polys) if (overlaps(p.box, dx)) p.rings.forEach(trace);
+          for (const p of c.polys) if (overlaps(p.box, dx)) p.lod[level].forEach(trace);
         }
         ctx.fillStyle = style;
         ctx.fill('evenodd');
@@ -234,7 +268,7 @@ export function createWorldMap() {
       // borders only once zoomed in: from far away they would cover small countries
       if (v.s > worldView().s * 2.5) {
         ctx.beginPath();
-        for (const b of world.borders) if (overlaps(b.box, dx)) trace(b.line);
+        for (const b of world.borders) if (overlaps(b.box, dx)) trace(b.lod[level]);
         ctx.lineWidth = 1.3 / v.s;
         ctx.strokeStyle = '#00ff00';
         ctx.stroke();
@@ -297,12 +331,14 @@ export function createWorldMap() {
       }
     }
 
-    // the place: a small red cross, and a ping now and then once arrived
+    // the place: a small red cross, and three pings once arrived (then the
+    // map holds still, so it costs nothing while you read)
+    const pinging = !!circle && !moving && arrived && now - arrived < PINGS * PING_MS;
     if (circle) {
       const mx = Math.floor(circle.cx);
       const my = Math.floor(circle.cy);
-      if (arrived && !moving) {
-        const p = ((now - arrived) % 2600) / 1600;
+      if (pinging) {
+        const p = ((now - arrived) % PING_MS) / 1600;
         if (p < 1) {
           const pr = p * circle.r;
           for (let a = 0; a < TAU; a += 0.6 / Math.max(1, pr)) {
@@ -313,7 +349,7 @@ export function createWorldMap() {
       for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) L.set(mx + dx, my + dy, 'M', 5);
     }
     L.flush();
-    return moving || !!circle;
+    return moving || pinging;
   }
 
   loadWorld().then((w) => {

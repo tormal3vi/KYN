@@ -43,6 +43,57 @@ pub struct ScanResult {
     pub scanned: usize,
     pub millis: u64,
     pub cancelled: bool,
+    /// how the other ports answered (see `Knock`)
+    pub tally: Tally,
+}
+
+/// What one knock on one port found, like nmap's open / closed / filtered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Knock {
+    /// accepted the connection
+    Open,
+    /// the device answered "nothing here" (TCP reset): it's there, port shut
+    Closed,
+    /// no answer in time: asleep, gone, or a firewall dropping everything
+    Silent,
+    /// this computer refused to even send it: no route, or (on macOS) KYN
+    /// isn't allowed to reach the local network
+    Blocked,
+}
+
+#[derive(Serialize, Default, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Tally {
+    pub open: usize,
+    pub closed: usize,
+    pub silent: usize,
+    pub blocked: usize,
+}
+
+impl Tally {
+    fn add(&mut self, k: Knock) {
+        match k {
+            Knock::Open => self.open += 1,
+            Knock::Closed => self.closed += 1,
+            Knock::Silent => self.silent += 1,
+            Knock::Blocked => self.blocked += 1,
+        }
+    }
+}
+
+/// Sort a failed connection attempt into closed / silent / blocked.
+pub fn classify(e: &std::io::Error) -> Knock {
+    use std::io::ErrorKind::*;
+    match e.kind() {
+        ConnectionRefused | ConnectionReset => Knock::Closed,
+        TimedOut => Knock::Silent,
+        HostUnreachable | NetworkUnreachable | PermissionDenied | AddrNotAvailable => Knock::Blocked,
+        _ => match e.raw_os_error() {
+            // EHOSTUNREACH / ENETUNREACH on macOS (65 / 51) and Linux (113 / 101), EPERM, EACCES
+            Some(65 | 51 | 113 | 101 | 1 | 13) => Knock::Blocked,
+            _ => Knock::Silent,
+        },
+    }
 }
 
 #[derive(Serialize)]
@@ -81,9 +132,13 @@ pub fn target_allowed(target: Ipv4Addr, own: Option<Ipv4Addr>, network: Option<(
     }
 }
 
-/// True if the port accepted a connection (we close it again right away).
-async fn knock(ip: Ipv4Addr, port: u16, wait: Duration) -> bool {
-    matches!(timeout(wait, TcpStream::connect((ip, port))).await, Ok(Ok(_)))
+/// Try one port (if it accepts, the connection is closed again right away).
+async fn knock(ip: Ipv4Addr, port: u16, wait: Duration) -> Knock {
+    match timeout(wait, TcpStream::connect((ip, port))).await {
+        Ok(Ok(_)) => Knock::Open,
+        Ok(Err(e)) => classify(&e),
+        Err(_) => Knock::Silent,
+    }
 }
 
 /// Knock on `ports` of `ip`, at most `parallel` at a time. Calls `on_open`
@@ -97,16 +152,18 @@ pub async fn scan_ports(
     cancelled: impl Fn() -> bool,
     on_open: impl Fn(u16),
     on_progress: impl Fn(usize),
-) -> (Vec<u16>, usize) {
+) -> (Vec<u16>, usize, Tally) {
     let done = AtomicUsize::new(0);
     let mut open = Vec::new();
+    let mut tally = Tally::default();
     let mut knocks = stream::iter(ports)
         .map(|port| async move { (port, knock(ip, port, wait).await) })
         .buffer_unordered(parallel);
     let mut last = Instant::now();
-    while let Some((port, is_open)) = knocks.next().await {
+    while let Some((port, result)) = knocks.next().await {
         let n = done.fetch_add(1, Ordering::Relaxed) + 1;
-        if is_open {
+        tally.add(result);
+        if result == Knock::Open {
             open.push(port);
             on_open(port);
         }
@@ -119,7 +176,7 @@ pub async fn scan_ports(
         }
     }
     open.sort_unstable();
-    (open, done.load(Ordering::Relaxed))
+    (open, done.load(Ordering::Relaxed), tally)
 }
 
 #[tauri::command]
@@ -156,7 +213,7 @@ pub async fn portaudit_scan(
     let started = Instant::now();
     let found = AtomicUsize::new(0);
     let _ = app.emit("portaudit:progress", Progress { done: 0, total, open: 0 });
-    let (open, scanned) = scan_ports(
+    let (open, scanned, tally) = scan_ports(
         target,
         ports,
         128,
@@ -174,7 +231,7 @@ pub async fn portaudit_scan(
     let cancelled = state.cancel.load(Ordering::SeqCst);
     let _ = app.emit("portaudit:progress", Progress { done: scanned, total, open: open.len() });
     state.running.store(false, Ordering::SeqCst);
-    Ok(ScanResult { ip: target.to_string(), open, scanned, millis: started.elapsed().as_millis() as u64, cancelled })
+    Ok(ScanResult { ip: target.to_string(), open, scanned, millis: started.elapsed().as_millis() as u64, cancelled, tally })
 }
 
 #[tauri::command]
@@ -224,7 +281,7 @@ mod tests {
         let ports: Vec<u16> = (port.saturating_sub(20)..=port.saturating_add(20)).collect();
         let total = ports.len();
         let reported = std::sync::Mutex::new(Vec::new());
-        let (open, scanned) = scan_ports(
+        let (open, scanned, tally) = scan_ports(
             Ipv4Addr::LOCALHOST,
             ports,
             32,
@@ -236,8 +293,20 @@ mod tests {
         .await;
         assert_eq!(scanned, total);
         assert!(open.contains(&port));
+        // everything else on 127.0.0.1 answers "closed" straight away
+        assert_eq!(tally.open, open.len());
+        assert_eq!(tally.open + tally.closed, total, "{tally:?}");
         assert_eq!(reported.lock().unwrap().contains(&port), true);
         drop(listener);
+    }
+
+    #[test]
+    fn sorts_failures() {
+        use std::io::{Error, ErrorKind};
+        assert_eq!(classify(&Error::from(ErrorKind::ConnectionRefused)), Knock::Closed);
+        assert_eq!(classify(&Error::from(ErrorKind::HostUnreachable)), Knock::Blocked);
+        assert_eq!(classify(&Error::from_raw_os_error(65)), Knock::Blocked); // macOS "No route to host"
+        assert_eq!(classify(&Error::from(ErrorKind::TimedOut)), Knock::Silent);
     }
 
     #[tokio::test]

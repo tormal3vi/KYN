@@ -10,7 +10,8 @@ export const isDemo = !tauri?.core?.invoke;
 /**
  * Knock on `ports` (or all 65,535 when ports is null) of `ip`.
  * onProgress({done, total, open}) and onOpen(port) stream in.
- * Resolves to { ip, open: [ports], scanned, millis, cancelled }.
+ * Resolves to { ip, open: [ports], scanned, millis, cancelled,
+ *   tally: { open, closed, silent, blocked } } (see Knock in portaudit/mod.rs).
  */
 export async function scan(ip, ports, { onProgress, onOpen }) {
   if (isDemo) return demoScan(ip, ports, onProgress, onOpen);
@@ -69,7 +70,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function demoScan(ip, ports, onProgress, onOpen) {
   demoCancel = false;
   const list = ports || Array.from({ length: 65535 }, (_, i) => i + 1);
-  const open = (DEMO_OPEN[ip] || [80]).filter((p) => list.includes(p));
+  const open = (DEMO_OPEN[ip] || (ip === '192.168.1.36' ? [] : [80])).filter((p) => list.includes(p));
   const steps = ports ? 12 : 40;
   const found = [];
   let done = 0;
@@ -82,5 +83,8 @@ async function demoScan(ip, ports, onProgress, onOpen) {
     onProgress({ done, total: list.length, open: found.length });
     await sleep(ports ? 70 : 90);
   }
-  return { ip, open: found.sort((a, b) => a - b), scanned: done, millis: ports ? 900 : 3600, cancelled: demoCancel };
+  // the offline iPad in the demo network doesn't answer at all
+  const quiet = !DEMO_OPEN[ip] && ip === '192.168.1.36';
+  const tally = quiet ? { open: 0, closed: 0, silent: done, blocked: 0 } : { open: found.length, closed: done - found.length, silent: 0, blocked: 0 };
+  return { ip, open: found.sort((a, b) => a - b), scanned: done, millis: ports ? 900 : 3600, cancelled: demoCancel, tally };
 }
