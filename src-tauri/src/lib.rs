@@ -5,7 +5,8 @@
 //! - This Rust side does what a web page is not allowed to do on its own:
 //!   reading basic system info, scanning *your own* local network (netmap/),
 //!   checking your own devices' open ports (portaudit/), and listing which
-//!   apps on this computer talk to where (traffic/).
+//!   apps on this computer talk to where (traffic/), and the one-key
+//!   security checks of OPS (ops/).
 //!
 //! JavaScript calls a Rust function with `invoke("function_name")`. The
 //! function must be marked `#[tauri::command]` and listed in
@@ -15,6 +16,7 @@ use serde::Serialize;
 use tauri::Manager;
 
 mod netmap;
+mod ops;
 mod portaudit;
 mod traffic;
 mod updater;
@@ -53,6 +55,8 @@ pub fn run() {
             app.manage(portaudit::PortauditState::default());
             // Traffic Monitor keeps the downloaded location database there too.
             app.manage(traffic::TrafficState::new(app.handle()));
+            // OPS keeps its run history and threat lists there as well.
+            app.manage(ops::OpsState::new(app.handle()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -70,6 +74,14 @@ pub fn run() {
             traffic::traffic_geo_status,
             traffic::traffic_geo_download,
             traffic::traffic_geo_lookup,
+            ops::ops_posture,
+            ops::ops_network,
+            ops::ops_captive,
+            ops::ops_dns,
+            ops::ops_tls,
+            ops::ops_threats,
+            ops::ops_history_load,
+            ops::ops_history_save,
             updater::update_check,
             updater::update_install,
         ])

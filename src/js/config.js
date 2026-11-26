@@ -27,6 +27,18 @@ export const BOOT_LINES = [
 //   planned = on the list    · locked = later / needs hardware
 export const MODULES = [
   {
+    id: 'ops',
+    cmd: 'ops',
+    name: 'Ops',
+    status: 'ready',
+    blurb: 'One-key security checks for the situation you\'re in: new Wi-Fi, lock down, who\'s on my Wi-Fi.',
+    plan: [
+      'SAFEHOUSE: is this café / hotel / school Wi-Fi safe to use?',
+      'LOCKDOWN: is this computer locked down? HEADCOUNT: who is on my Wi-Fi?',
+      'CHECKPOINT: is my router OK? BLACKLIST: is anything talking to known-bad servers?',
+    ],
+  },
+  {
     id: 'netmap',
     cmd: 'netmap',
     name: 'Network Map',

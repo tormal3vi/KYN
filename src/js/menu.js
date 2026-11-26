@@ -9,6 +9,7 @@
 import { APP, MODULES, STATUS } from './config.js';
 import { revealScreen } from './fx.js';
 import { createNetmap } from './netmap/screen.js';
+import { createOps } from './ops/screen.js';
 import { createPortaudit } from './portaudit/screen.js';
 import { createTraffic } from './traffic/screen.js';
 import { checkForUpdate, installUpdate } from './updates.js';
@@ -189,6 +190,7 @@ export function createMenu(term, info) {
     if (netmap.active) { netmap.draw(); return; }
     if (portaudit.active) { portaudit.draw(); return; }
     if (traffic.active) { traffic.draw(); return; }
+    if (ops.active) { ops.draw(); return; }
     token++;
     term.clear();
     paint(term);
@@ -215,6 +217,11 @@ export function createMenu(term, info) {
       portaudit.open({ from: 'menu' });
       return;
     }
+    if (MODULES[i].id === 'ops' && MODULES[i].status === 'ready') {
+      token++;
+      ops.open();
+      return;
+    }
     if (MODULES[i].id === 'traffic' && MODULES[i].status === 'ready') {
       token++;
       traffic.open();
@@ -233,6 +240,7 @@ export function createMenu(term, info) {
     if (netmap.active) { netmap.handleKey(e); return; }
     if (portaudit.active) { portaudit.handleKey(e); return; }
     if (traffic.active) { traffic.handleKey(e); return; }
+    if (ops.active) { ops.handleKey(e); return; }
     const k = e.key;
     if (open >= 0) {
       if (k === 'Escape' || k === 'Backspace') { e.preventDefault(); closeModule(); }
@@ -249,7 +257,7 @@ export function createMenu(term, info) {
     else if (/^[1-9]$/.test(k) && Number(k) <= MODULES.length) { e.preventDefault(); openModule(Number(k) - 1); }
   }
 
-  const inModule = () => netmap.active || portaudit.active || traffic.active;
+  const inModule = () => netmap.active || portaudit.active || traffic.active || ops.active;
 
   const portaudit = createPortaudit(term, {
     paintHeader: paintTop,
@@ -258,6 +266,13 @@ export function createMenu(term, info) {
   });
 
   const traffic = createTraffic(term, { paintHeader: paintTop, onExit: () => reveal() });
+
+  // OPS can hand over to another module (e.g. HEADCOUNT → Network Map)
+  const ops = createOps(term, {
+    paintHeader: paintTop,
+    onExit: () => reveal(),
+    onGoto: (id) => openModule(Math.max(0, MODULES.findIndex((m) => m.id === id))),
+  });
 
   const netmap = createNetmap(term, {
     paintHeader: paintTop,

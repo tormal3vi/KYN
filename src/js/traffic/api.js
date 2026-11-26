@@ -94,6 +94,9 @@ const CONNS = [
   ['curl', 9001, 'tcp', '93.184.215.14', 80, 0.01, 0.001, 0, 0],
   ['mDNSResponder', 300, 'udp', '192.168.1.1', 53, 0.8, 0.3, 0.1, 0.1],
   ['rapportd', 431, 'tcp', '192.168.1.31', 49152, 0.1, 0.05, 0, 0],
+  // a made-up bad app, so the demo of OPS › BLACKLIST has something to find.
+  // 203.0.113.0/24 is reserved for examples: it belongs to nobody.
+  ['UpdateHelper', 8120, 'tcp', '203.0.113.66', 8443, 0.3, 0.2, 0.1, 0.1],
 ];
 
 const demo = { geoReady: false, started: Date.now() };

@@ -56,7 +56,7 @@ export function createPortaudit(term, { paintHeader, onExit }) {
     try {
       net = net || await netapi.getNetwork();
       if (net?.approved) devices = await netapi.remembered(net.id);
-      else hint = 'Confirm your network in Network Map (1) to check your other devices too.';
+      else hint = 'Confirm your network in Network Map (2 in the menu) to check your other devices too.';
     } catch {
       hint = 'No network found: you can still check this computer.';
     }

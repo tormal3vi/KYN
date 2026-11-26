@@ -38,11 +38,12 @@ anything else aimed at people or devices you don't own.
 | # | Module | Status |
 | --- | --- | --- |
 | – | Startup → logo → module menu | **done** |
-| 1 | Network Map: devices on your LAN, with icons, names, vendor, online/offline | **done** |
-| 2 | Port Audit: open ports on your machines, risky ones explained | **done** |
-| 3 | Traffic Monitor: which app on this computer talks to which server, how much, and where in the world | **done** |
-| 4 | Watchdog: ping your services, alert when one is down | planned |
-| 5 | Hardware Link: ESP32 / Flipper Zero you own | later |
+| 1 | OPS: one-key security checks per situation (SAFEHOUSE, LOCKDOWN, HEADCOUNT, CHECKPOINT, BLACKLIST) | **done** |
+| 2 | Network Map: devices on your LAN, with icons, names, vendor, online/offline | **done** |
+| 3 | Port Audit: open ports on your machines, risky ones explained | **done** |
+| 4 | Traffic Monitor: which app on this computer talks to which server, how much, and where in the world | **done** |
+| 5 | Watchdog: ping your services, alert when one is down | planned |
+| 6 | Hardware Link: ESP32 / Flipper Zero you own | later |
 | – | Installable app (Dock + icon) with signed auto-updates | **done**, see [docs/UPDATES.md](docs/UPDATES.md) |
 
 ## Run it
@@ -63,7 +64,7 @@ npm run release -- 0.2.0   # publish a new version (auto-update), see docs/UPDAT
 
 ## Network Map
 
-Open it from the menu (`1`). The first time KYN sees a network it asks you to
+Open it from the menu (`2`). The first time KYN sees a network it asks you to
 confirm it's yours; it remembers that per network.
 
 **What a scan does** (`src-tauri/src/netmap/scan.rs`, about 5–8 seconds):
@@ -105,7 +106,7 @@ In the browser preview there's no Rust, so it plays a demo network instead
 
 ## Port Audit
 
-Open it from the menu (`2`), or press `p` on a device in Network Map.
+Open it from the menu (`3`), or press `p` on a device in Network Map.
 
 Pick a device, then `enter` for a **quick check** (the ~140 ports in
 `src/js/portaudit/knowledge.js`, a few seconds) or `f` for a **full check**
@@ -123,15 +124,62 @@ listens on this computer ("local"), and whether the firewall is on. macOS
 only shows the names of system services to admins, so those appear as
 "a system service".
 
+**Nothing open?** Every knock is sorted like nmap does: *open*, *closed*
+(the device answered "nothing here"), or *no answer*. KYN tells you which
+one it was. "Couldn't reach the device at all" on a Mac almost always means
+macOS is blocking KYN from the local network: System Settings → Privacy &
+Security → Local Network → switch on KYN (or Terminal, when you start KYN
+with `npm run dev`), then press `r`.
+
 **Scope:** this computer, or devices on the network you confirmed in Network
 Map. Anything else is refused (`src-tauri/src/portaudit/mod.rs`).
 
 **Keys:** `↑` `↓` select · `r` check again · `f` full check · `t` pick
 another device · `esc` back.
 
+## OPS
+
+The first module (`1` in the menu): security checks you run with one key,
+picked by the situation you're in. Each op runs a chain of checks as a live
+log, ends with a verdict (`CLEAR`, `CAUTION`, `ALERT`, or `UNSURE` when the
+main check couldn't run) and a numbered to-do list in plain language, and
+remembers its runs so the next one can tell you what changed.
+
+| Op | When | What it checks |
+| --- | --- | --- |
+| **SAFEHOUSE** | you just joined a café, hotel, airport or school Wi-Fi | login page in the way, honest DNS answers, nobody reading your HTTPS, VPN, firewall, what on this computer strangers on the network can reach |
+| **LOCKDOWN** | monthly, or before travelling | disk encryption (FileVault / BitLocker), firewall, stealth mode, Gatekeeper / Defender, System Integrity Protection, automatic security fixes, remote-access doors |
+| **HEADCOUNT** | slow internet, guests, weekly | every device on your Wi-Fi, who's new since the last headcount, who you haven't marked as yours |
+| **CHECKPOINT** | new router or new settings | the router's open doors (Telnet, UPnP, TR-069...), encrypted settings page, which DNS servers it hands out, honest DNS |
+| **BLACKLIST** | something feels off | every server your apps talk to, against public threat lists; apps online for the first time; unencrypted connections |
+
+How the two network checks work:
+
+- **Honest DNS:** three names whose addresses never change
+  (`one.one.one.one`, `dns.google`, `dns.quad9.net`) are looked up through
+  the network's DNS and compared with their real addresses. A made-up name
+  must not exist. Hostile Wi-Fi that redirects you fails this.
+- **Nobody reading your HTTPS:** three well-known sites are opened twice:
+  once trusting what this computer trusts, once trusting only Mozilla's public
+  list of certificate authorities. If the network swaps certificates, both
+  fail. If something installed on this computer inspects HTTPS (antivirus
+  "web shields", work device management, or malware), only the second fails.
+
+**Threat lists** (BLACKLIST): abuse.ch Feodo Tracker (botnet control servers,
+CC0), Spamhaus DROP (hijacked criminal networks) and Emerging Threats
+(compromised machines). Downloaded at most every 12 hours into KYN's data
+folder and matched on this computer; your addresses are never sent anywhere.
+
+Each op lives in `src/js/ops/catalog.js` as a list of steps, so adding one is
+adding an entry there. Every op only looks at this computer, its own traffic,
+or devices on the network you confirmed as yours.
+
+**Keys:** `↑` `↓` select · `enter` run · `r` run again · the op's shortcut
+(`m` Network Map, `p` Port Audit, `t` Traffic Monitor) · `esc` back.
+
 ## Traffic Monitor
 
-Open it from the menu (`3`). It lists every app on this computer that is
+Open it from the menu (`4`). It lists every app on this computer that is
 online right now: how many servers it talks to, how fast data is moving
 (`↓` in, `↑` out), how much it used since it started, and which countries
 its servers are in. `enter` shows one app's servers: where each one is, who
@@ -214,6 +262,9 @@ src/                     the UI: plain HTML/CSS/JS, no framework, no build step
   js/portaudit/screen.js Port Audit: device picker, results, explanations
   js/portaudit/knowledge.js  what each port is, risk level, how to fix it
   js/portaudit/api.js    calls into Rust (or plays demo data in a browser)
+  js/ops/catalog.js      OPS: the ops and their steps. Add new ops here.
+  js/ops/screen.js       OPS: op list, live run log, verdict, history
+  js/ops/api.js          calls into Rust (or plays a demo Mac in a browser)
   js/traffic/screen.js   Traffic Monitor: apps, servers, keys
   js/traffic/worldmap.js the zooming world map (dots on the fine grid)
   js/traffic/model.js    apps from raw connections, speeds, port names
@@ -231,6 +282,8 @@ src-tauri/               the native app (Rust)
                          "which app listens where" report for this computer
   src/traffic/           this computer's connections and data per app, and
                          the offline place / owner lookup
+  src/ops/               OPS building blocks: protections, honest-network
+                         checks, threat lists, run history
   data/oui.tsv           MAC prefix → manufacturer table (npm run update-oui)
   Info.plist             macOS: why KYN asks for local-network access
   tauri.conf.json        window size, app name, icons, security policy
