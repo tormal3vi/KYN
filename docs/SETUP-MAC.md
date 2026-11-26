@@ -123,7 +123,9 @@ the Terminal itself. Make the window big first (full screen works best):
 npm run boot:cli
 ```
 
-Any key exits. If the window is too small for the logo, it shows text only.
+Any key exits. A terminal has only one character size, so it shows a simpler
+text version of the logo (the app draws the detailed one). If the window is
+too small for the logo, it shows text only.
 
 ## 8. (Optional) Preview in a normal browser
 

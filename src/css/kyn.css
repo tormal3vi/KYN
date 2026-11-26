@@ -41,6 +41,18 @@ body { overflow: hidden; }
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 
+.screen {
+  position: relative;
+}
+
+/* the detailed logo is drawn on a canvas laid over the text grid */
+.screen .layer {
+  position: absolute;
+  pointer-events: none;
+}
+
+.screen.is-pointer { cursor: pointer; }
+
 .term {
   margin: 0;
   overflow: hidden;
@@ -61,8 +73,6 @@ body { overflow: hidden; }
   display: block;
   height: var(--row-h, 18px);
 }
-
-.term.is-pointer { cursor: pointer; }
 
 /* the red "_" cursor blinks like a terminal cursor: 530ms on, 530ms off */
 .term .cursor { animation: blink 1.06s steps(1, end) infinite; }

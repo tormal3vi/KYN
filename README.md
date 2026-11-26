@@ -12,8 +12,8 @@
 
 A desktop security toolkit for **your own devices and your own network**. It
 looks and behaves like a command-line program: one black screen, one
-monospace grid, a typed startup log, the KYN mask drawn in plain text, and a
-keyboard-driven module menu.
+monospace grid, a decoding startup log, the KYN mask assembling itself out
+of character static, and a keyboard-driven module menu.
 
 Built with [Tauri 2](https://tauri.app): a small Rust app that shows a web UI
 in the system's own browser engine. One UI ships to macOS (first) and Windows
@@ -51,7 +51,7 @@ First time on a Mac? Follow **[docs/SETUP-MAC.md](docs/SETUP-MAC.md)**.
 ```bash
 npm install         # once
 npm run dev         # the app, in a window (reloads when you edit src/)
-npm run boot:cli    # the same startup, in your real terminal
+npm run boot:cli    # the same startup in your real terminal (text logo)
 npm run preview     # the UI in a normal browser, http://localhost:5173
 npm run build       # make KYN.app + .dmg
 ```
@@ -63,9 +63,14 @@ npm run build       # make KYN.app + .dmg
 
 The look comes from the KYN reference artwork:
 
-- **Everything is text on a character grid.** No images, gradients, glow or
-  animation that a real terminal couldn't do. The only motion is text being
-  printed and the cursor blinking.
+- **Everything is made of characters.** Text sits on a monospace grid. The
+  logo sits on a grid twice as fine (half the text size, exactly like the
+  artwork), drawn as character-sized shapes: mesh squares, dashes, crosses,
+  dots. No blur, glow or gradients.
+- **Motion is character motion.** Text decodes out of scrambled characters,
+  the logo assembles from static, a glint passes over it, and the idle loop
+  sends pulses of light along the streaks and makes the eyes glimmer. All of
+  it is characters changing, so a terminal can play it too.
 - **Monochrome on pure black**, with a single red accent: the `_` cursor
   (and the rare warning).
 - **Colours are standard terminal colours** (the 256-colour set), defined
@@ -84,8 +89,9 @@ src/                     the UI: plain HTML/CSS/JS, no framework, no build step
   fonts/                 JetBrains Mono (subset) + its license
   js/config.js           name, tagline, startup lines, module list. Start here.
   js/palette.js          the colours (terminal colour numbers + exact hex)
-  js/logo.js             the KYN mask as 68×36 characters + brightness map
-  js/boot.js             the startup sequence, as a "terminal program"
+  js/logo.js             the KYN mask: FINE (105×109, app) and COARSE (68×36 text)
+  js/boot.js             startup, idle loop and exit, as a "terminal program"
+  js/fx.js               character effects: decode, scramble, screen reveal
   js/term-web.js         draws that terminal program inside the window
   js/menu.js             the module menu, on the same grid
   js/sysinfo.js          asks Rust for hostname/OS (browser fallback in preview)
@@ -136,9 +142,16 @@ device list to the UI.
 
 ## Changing the logo
 
-The logo is plain text in `src/js/logo.js`. `ART` is what's printed; `TONE`
-is the same shape with `b` (bright), `n` (normal) or `d` (dim) per character.
-Edit both together, then `npm run icon` to rebuild the app icon.
+The logo lives in `src/js/logo.js`, traced from the KYN artwork, in two sizes:
+
+- `FINE` (105×109 cells) is what the app draws, at half the text size. Each
+  cell is a shape code: `M` mesh square, `-` and `=` streaks, `+` cross,
+  `|` post, `.` and `:` dots, with a brightness from `0` (faint) to `3`.
+- `COARSE` (68×36 plain characters) is for real terminals, where every
+  character is the same size. Brightness is `b`, `n` or `d`.
+
+Edit the shape and brightness rows together, then run `npm run icon` to
+rebuild the app icon.
 
 ## Renaming the app
 

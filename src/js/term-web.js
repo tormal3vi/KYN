@@ -4,15 +4,18 @@
 // Keeps a grid of characters (like a real terminal's screen buffer) and draws
 // it as text in a <pre>. The font size is chosen so the grid fits the window;
 // resizing the window recalculates it, like resizing a terminal.
-// Implements the "term" interface described at the top of boot.js, plus
-// clickable regions (addHit) for the menu.
+//
+// Implements the "term" interface described at the top of boot.js, plus:
+//   term.image(...)  a finer grid of character-sized shapes laid over some
+//                    text cells (used for the detailed logo)
+//   term.addHit(...) clickable regions (used by the menu)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { COLORS, STYLES } from './palette.js';
+import { COLORS, STYLES, TONES } from './palette.js';
 
 const LINE = 1.25;   // line height as a multiple of font size (matches the KYN artwork)
 const MIN_FS = 8;    // px
-const MAX_FS = 22;   // px
+const MAX_FS = 24;   // px
 
 const ESC_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
 const esc = (s) => s.replace(/[&<>]/g, (c) => ESC_MAP[c]);
@@ -20,8 +23,11 @@ const esc = (s) => s.replace(/[&<>]/g, (c) => ESC_MAP[c]);
 /** Add one CSS class per style from palette.js (via CSSOM, which the app's
  *  security policy allows), so colours are defined in exactly one place. */
 function installStyleClasses() {
-  const rules = Object.entries(STYLES).map(([name, st]) =>
-    `.term .s-${name}{color:${COLORS[st.color].hex};font-weight:${st.bold ? 700 : 400}}`);
+  const rules = Object.entries(STYLES).map(([name, st]) => {
+    const fg = st.inverse ? COLORS.black.hex : COLORS[st.color].hex;
+    const bg = st.inverse ? `background:${COLORS[st.color].hex};` : '';
+    return `.term .s-${name}{color:${fg};${bg}font-weight:${st.bold ? 700 : 400}}`;
+  });
   rules.push(`.term .cursor{color:${COLORS.red.hex}}`);
   try {
     const sheet = [...document.styleSheets].find((s) => (s.href || '').endsWith('kyn.css'));
@@ -43,13 +49,30 @@ async function fontsReady() {
   } catch { /* fall back to the system monospace font */ }
 }
 
+/** Draw one logo cell as a small shape, in the style of the KYN artwork. */
+function drawGlyph(ctx, g, x, y, w, h) {
+  switch (g) {
+    case 'M': { const p = Math.max(0.6, w * 0.1); ctx.fillRect(x + p, y + p, w - 2 * p, h - 2 * p); break; }
+    case '-': ctx.fillRect(x, y + h * 0.42, w, Math.max(1, h * 0.18)); break;
+    case '=': ctx.fillRect(x, y + h * 0.2, w, Math.max(1, h * 0.16)); ctx.fillRect(x, y + h * 0.62, w, Math.max(1, h * 0.16)); break;
+    case '|': ctx.fillRect(x + w * 0.4, y, Math.max(1, w * 0.2), h); break;
+    case '+': ctx.fillRect(x + w * 0.1, y + h * 0.42, w * 0.8, Math.max(1, h * 0.16)); ctx.fillRect(x + w * 0.42, y + h * 0.1, Math.max(1, w * 0.16), h * 0.8); break;
+    case '.': ctx.fillRect(x + w * 0.32, y + h * 0.32, w * 0.36, h * 0.36); break;
+    case ':': ctx.fillRect(x + w * 0.35, y + h * 0.1, w * 0.3, h * 0.28); ctx.fillRect(x + w * 0.35, y + h * 0.62, w * 0.3, h * 0.28); break;
+    default: break;
+  }
+}
+
 export async function createWebTerminal(host, { minimums }) {
   installStyleClasses();
   await fontsReady();
 
+  const screen = document.createElement('div');
+  screen.className = 'screen';
   const pre = document.createElement('pre');
   pre.className = 'term';
-  host.append(pre);
+  screen.append(pre);
+  host.append(screen);
 
   // How wide one character is, per 1px of font size.
   const probe = document.createElement('span');
@@ -66,6 +89,7 @@ export async function createWebTerminal(host, { minimums }) {
   const dirty = new Set();
   let cur = null;
   let hits = [];
+  let layers = [];
   const resizeHandlers = [];
 
   function fit() {
@@ -90,8 +114,8 @@ export async function createWebTerminal(host, { minimums }) {
     pre.style.fontSize = `${fs}px`;
     pre.style.lineHeight = `${cellH}px`;
     pre.style.setProperty('--row-h', `${cellH}px`);
-    pre.style.width = `${cols * cellW}px`;
-    pre.style.height = `${rows * cellH}px`;
+    screen.style.width = `${cols * cellW}px`;
+    screen.style.height = `${rows * cellH}px`;
 
     chars = Array.from({ length: rows }, () => Array(cols).fill(' '));
     styles = Array.from({ length: rows }, () => Array(cols).fill(''));
@@ -102,6 +126,8 @@ export async function createWebTerminal(host, { minimums }) {
       pre.append(r);
       return r;
     });
+    layers.forEach((l) => l.remove());
+    layers = [];
     cur = null;
     hits = [];
   }
@@ -115,6 +141,8 @@ export async function createWebTerminal(host, { minimums }) {
     if (cur) dirty.add(cur.y);
     cur = null;
     hits = [];
+    layers.forEach((l) => l.remove());
+    layers = [];
   };
 
   term.write = (x, y, text, style = 'text') => {
@@ -124,7 +152,7 @@ export async function createWebTerminal(host, { minimums }) {
       const cx = x + i;
       if (cx < 0 || cx >= term.cols) continue;
       chars[y][cx] = s[i];
-      styles[y][cx] = s[i] === ' ' ? '' : style;
+      styles[y][cx] = s[i] === ' ' && style !== 'inverse' ? '' : style;
     }
     dirty.add(y);
   };
@@ -162,6 +190,55 @@ export async function createWebTerminal(host, { minimums }) {
     dirty.clear();
   };
 
+  // ── fine image layer: a cols×rows grid of shapes over w×h text cells ─────
+  term.image = (x, y, w, h, cols, rows) => {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'layer';
+    const dpr = window.devicePixelRatio || 1;
+    const pxW = w * term.cellW;
+    const pxH = h * term.cellH;
+    canvas.width = Math.round(pxW * dpr);
+    canvas.height = Math.round(pxH * dpr);
+    canvas.style.left = `${x * term.cellW}px`;
+    canvas.style.top = `${y * term.cellH}px`;
+    canvas.style.width = `${pxW}px`;
+    canvas.style.height = `${pxH}px`;
+    screen.append(canvas);
+    layers.push(canvas);
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    const cw = pxW / cols;
+    const ch = pxH / rows;
+    const glyph = new Array(cols * rows).fill(' ');
+    const tone = new Uint8Array(cols * rows);
+    const colors = TONES.map((name) => COLORS[name].hex);
+    let changed = false;
+    return {
+      cols,
+      rows,
+      set(c, r, g, t) {
+        if (c < 0 || r < 0 || c >= cols || r >= rows) return;
+        const i = r * cols + c;
+        if (glyph[i] === g && tone[i] === t) return;
+        glyph[i] = g;
+        tone[i] = t;
+        changed = true;
+      },
+      flush() {
+        if (!changed) return;
+        changed = false;
+        ctx.clearRect(0, 0, pxW, pxH);
+        for (let t = 0; t < colors.length; t++) {
+          ctx.fillStyle = colors[t];
+          for (let i = 0; i < glyph.length; i++) {
+            if (tone[i] !== t || glyph[i] === ' ') continue;
+            drawGlyph(ctx, glyph[i], (i % cols) * cw, Math.floor(i / cols) * ch, cw, ch);
+          }
+        }
+      },
+    };
+  };
+
   // ── clickable regions (used by the menu) ─────────────────────────────────
   term.addHit = (x, y, w, h, handlers) => hits.push({ x, y, w, h, ...handlers });
   const hitAt = (e) => {
@@ -174,12 +251,12 @@ export async function createWebTerminal(host, { minimums }) {
     }
     return null;
   };
-  pre.addEventListener('mousemove', (e) => {
+  screen.addEventListener('mousemove', (e) => {
     const h = hitAt(e);
-    pre.classList.toggle('is-pointer', !!h);
+    screen.classList.toggle('is-pointer', !!h);
     h?.hover?.();
   });
-  pre.addEventListener('click', (e) => hitAt(e)?.click?.());
+  screen.addEventListener('click', (e) => hitAt(e)?.click?.());
 
   // ── resizing ─────────────────────────────────────────────────────────────
   term.onResize = (fn) => resizeHandlers.push(fn);

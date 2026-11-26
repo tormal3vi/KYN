@@ -1,31 +1,39 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Entry point:  startup (boot.js)  →  wait for a key  →  module menu (menu.js)
+// Entry point:
+//   startup (boot.js) → idle splash until a key → dissolve → module menu
 //
 // During startup: any key = finish instantly, Esc = skip straight to the menu.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { APP } from './config.js';
-import { GRID_MINIMUMS, runBoot } from './boot.js';
+import { FINE } from './logo.js';
+import { gridMinimums, runBoot, startIdle, runExit } from './boot.js';
 import { createWebTerminal } from './term-web.js';
 import { getSystemInfo } from './sysinfo.js';
 import { createMenu } from './menu.js';
 
 document.title = APP.name;
+const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-let state = 'boot'; // boot → splash → menu
-const ctrl = { fast: false, skip: false };
+let state = 'boot'; // boot → splash → leaving → menu
+const ctrl = { fast: calm, skip: false };
 let continueFromSplash = null;
 
 async function start() {
-  const term = await createWebTerminal(document.getElementById('app'), { minimums: GRID_MINIMUMS });
+  const term = await createWebTerminal(document.getElementById('app'), { minimums: gridMinimums(FINE) });
   const info = await getSystemInfo();
   const menu = createMenu(term, info);
+  let scene = null;
+  let stopIdle = () => {};
 
   // Resizing the window changes the grid, so redraw the current screen.
-  term.onResize(() => {
-    if (state === 'boot') ctrl.fast = true; // finish now; the final frame is redrawn below
-    else if (state === 'splash') runBoot(term, { fast: true });
-    else menu.draw();
+  term.onResize(async () => {
+    if (state === 'boot') ctrl.fast = true; // finish now; redrawn below at the new size
+    else if (state === 'splash') {
+      stopIdle();
+      scene = await runBoot(term, { fast: true });
+      stopIdle = startIdle(scene, { calm });
+    } else if (state === 'menu') menu.draw();
   });
 
   document.addEventListener('keydown', (e) => {
@@ -35,7 +43,7 @@ async function start() {
       else ctrl.fast = true;
     } else if (state === 'splash') {
       continueFromSplash?.();
-    } else {
+    } else if (state === 'menu') {
       menu.handleKey(e);
     }
   });
@@ -44,14 +52,18 @@ async function start() {
     else if (state === 'splash') continueFromSplash?.();
   });
 
-  await runBoot(term, ctrl);
+  scene = await runBoot(term, ctrl);
   if (!ctrl.skip) {
-    if (ctrl.fast) await runBoot(term, { fast: true }); // clean final frame at the current size
+    if (ctrl.fast) scene = await runBoot(term, { fast: true }); // clean final frame at the current size
     state = 'splash';
+    stopIdle = startIdle(scene, { calm });
     await new Promise((resolve) => { continueFromSplash = resolve; });
+    stopIdle();
+    state = 'leaving';
+    await runExit(term, scene, { fast: calm });
   }
   state = 'menu';
-  menu.show();
+  await menu.show({ animate: !calm });
 }
 
 start().catch((err) => {
