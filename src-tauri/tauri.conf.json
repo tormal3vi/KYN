@@ -44,7 +44,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU0RjI3RkNDMzhCMkVCQzAKUldUQTY3STR6SC95NUZ2dW1zeld0K2RWVm9USXJmbFl6UjIrNGxXanVudDhrcDVtWFpYbEhtQ3oK",
       "endpoints": [
         "https://github.com/tormal3vi/KYN/releases/latest/download/latest.json"
       ]
