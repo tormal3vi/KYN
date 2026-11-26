@@ -41,5 +41,13 @@
     "macOS": {
       "minimumSystemVersion": "11.0"
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [
+        "https://github.com/tormal3vi/KYN/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

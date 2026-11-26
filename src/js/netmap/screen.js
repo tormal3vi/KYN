@@ -281,7 +281,8 @@ export function createNetmap(term, { paintHeader, onExit, calm = false }) {
   function paintList() {
     const { area } = geo;
     const per = 3;
-    const visible = Math.max(1, Math.floor(area.h / per));
+    const overflow = devices.length * per > area.h;
+    const visible = Math.max(1, Math.floor((area.h - (overflow ? 1 : 0)) / per));
     const si = selIndex();
     const first = Math.min(Math.max(0, si - visible + 2), Math.max(0, devices.length - visible));
     nodes = [];
@@ -302,8 +303,10 @@ export function createNetmap(term, { paintHeader, onExit, calm = false }) {
       term.write(tx, y + 2, d.pending ? 'checking...' : d.online ? 'online' : `offline · seen ${ago(d.lastSeen)}`, d.online && !d.pending ? 'muted' : 'faint');
       term.addHit(area.x, y, area.w, per, { hover: () => hover(d), click: () => clickDevice(d) });
     });
-    if (devices.length > visible) {
-      term.write(area.x + area.w - 12, area.y + area.h - 1, `${si + 1}/${devices.length}`.padStart(12), 'faint');
+    if (overflow) {
+      const below = Math.max(0, devices.length - first - visible);
+      const hint = [first && `↑ ${first} more above`, below && `↓ ${below} more below`].filter(Boolean).join('   ');
+      term.write(area.x + 8, area.y + area.h - 1, `${hint}   (↑↓ or scroll · ${devices.length} total)`, 'gray');
     }
   }
 
@@ -577,6 +580,13 @@ export function createNetmap(term, { paintHeader, onExit, calm = false }) {
       default: break;
     }
   }
+
+  // Mouse wheel / trackpad moves through the devices (handy in the list).
+  term.onWheel?.((dir) => {
+    if (!active || mode !== 'normal' || !devices.length) return;
+    const to = Math.max(0, Math.min(devices.length - 1, selIndex() + dir)); // stop at the ends
+    if (to !== selIndex()) select(to);
+  });
 
   return { open, draw, handleKey, get active() { return active; } };
 }

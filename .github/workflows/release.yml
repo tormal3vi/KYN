@@ -1,0 +1,72 @@
+# Builds KYN for macOS (Apple Silicon + Intel) and Windows and publishes a
+# GitHub Release containing the installers and the signed update files that
+# the app checks for (latest.json). See docs/UPDATES.md.
+#
+# Runs when you push a version tag, e.g. v0.2.0 (`npm run release -- 0.2.0`
+# creates the tag, `git push --follow-tags` sends it).
+
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  publish:
+    permissions:
+      contents: write # create the release and upload files to it
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest # Apple Silicon (M1 and newer)
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest # Intel Macs
+            args: --target x86_64-apple-darwin
+          - platform: windows-latest
+            args: ''
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: check update signing is set up
+        shell: bash
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::The TAURI_SIGNING_PRIVATE_KEY secret is missing. See docs/UPDATES.md, step 1."
+            exit 1
+          fi
+          node -e "const c=require('./src-tauri/tauri.conf.json'); if(!c.plugins.updater.pubkey){console.log('::error::No public key in src-tauri/tauri.conf.json. Run npm run setup-updates (docs/UPDATES.md).'); process.exit(1)}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v__VERSION__
+          releaseName: KYN v__VERSION__
+          releaseBody: Download the installer for your computer below. Already have KYN installed? It updates itself.
+          releaseDraft: false
+          prerelease: false
+          # tauri.updater.conf.json switches on the signed update files
+          args: ${{ matrix.args }} --config src-tauri/tauri.updater.conf.json

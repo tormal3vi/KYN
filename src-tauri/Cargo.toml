@@ -24,3 +24,5 @@ mdns-sd = "0.22"         # Bonjour / mDNS: names and device types
 dns-lookup = "4"         # reverse DNS (IP -> name) via your router
 futures = "0.3"
 tokio = { version = "1", features = ["net", "time", "sync", "macros", "rt", "process"] }
+# Auto-updates (desktop only)
+tauri-plugin-updater = "2"

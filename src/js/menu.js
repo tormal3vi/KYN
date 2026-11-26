@@ -9,6 +9,7 @@
 import { APP, MODULES, STATUS } from './config.js';
 import { revealScreen } from './fx.js';
 import { createNetmap } from './netmap/screen.js';
+import { checkForUpdate, installUpdate } from './updates.js';
 
 const X = 3; // left margin, same as the boot log
 
@@ -41,6 +42,8 @@ export function createMenu(term, info) {
   let visible = false;
   let animate = true;
   let token = 0; // bumps on every redraw, so a running reveal knows to stop
+  let update = null; // see updates.js; plus 'downloading' / 'installing' / 'failed'
+  let checked = false;
 
   const hostLine = info.native
     ? `${info.hostname} · ${info.os} ${info.arch}`
@@ -62,6 +65,51 @@ export function createMenu(term, info) {
     t.write(X + 10, 4, fit(hostLine, t.cols - X * 2 - 10), 'text');
     t.write(X, 5, '[+] scope ', 'gray');
     t.write(X + 10, 5, 'own devices and own network only', 'text');
+    paintUpdate(t);
+  }
+
+  /** Row 6: a new version is ready / downloading / failed. Quiet otherwise. */
+  function paintUpdate(t) {
+    if (!update) return;
+    const y = 6;
+    const label = '[+] update  ';
+    const vx = X + label.length;
+    if (update.state === 'failed') {
+      t.write(X, y, fit(`[!] update failed: ${update.message}`, t.cols - X * 2), 'red');
+      return;
+    }
+    t.write(X, y, label, 'gray');
+    if (update.state === 'available') {
+      t.write(vx, y, `v${update.version} is ready · press u to install`, 'text');
+      t.addHit(X, y, 50, 1, { click: startUpdate });
+    } else if (update.state === 'downloading') {
+      const cells = 20;
+      const pct = update.total ? Math.min(100, Math.round((update.downloaded / update.total) * 100)) : 0;
+      const filled = Math.round((pct / 100) * cells);
+      const text = `downloading v${update.version}  `;
+      t.write(vx, y, text, 'text');
+      t.write(vx + text.length, y, '█'.repeat(filled), 'text');
+      t.write(vx + text.length + filled, y, '░'.repeat(cells - filled), 'faint');
+      t.write(vx + text.length + cells + 1, y, `${pct}%`, 'text');
+    } else if (update.state === 'installing') {
+      t.write(vx, y, 'installing... KYN will restart by itself', 'text');
+    }
+  }
+
+  async function startUpdate() {
+    if (update?.state !== 'available') return;
+    const version = update.version;
+    update = { state: 'downloading', version, downloaded: 0, total: 0 };
+    draw();
+    try {
+      await installUpdate((p) => {
+        update = p.installing ? { state: 'installing', version } : { state: 'downloading', version, ...p };
+        if (!netmap.active) draw();
+      });
+    } catch (e) {
+      update = { state: 'failed', message: String(e?.message || e) };
+      if (!netmap.active) draw();
+    }
   }
 
   function paintList(t, y0) {
@@ -175,6 +223,7 @@ export function createMenu(term, info) {
       else draw(); // any other key finishes a running reveal
       return;
     }
+    if ((k === 'u' || k === 'U') && update?.state === 'available') { e.preventDefault(); startUpdate(); return; }
     const move = (to) => { e.preventDefault(); index = (to + MODULES.length) % MODULES.length; draw(); };
     if (k === 'ArrowDown' || k === 'j') move(index + 1);
     else if (k === 'ArrowUp' || k === 'k') move(index - 1);
@@ -200,6 +249,15 @@ export function createMenu(term, info) {
     async show(opts = {}) {
       visible = true;
       animate = opts.animate !== false;
+      if (!checked) {
+        checked = true;
+        // Ask GitHub (via Rust) whether a newer version exists; quiet if not.
+        checkForUpdate().then((s) => {
+          if (s?.state !== 'available') return;
+          update = s;
+          if (visible && !netmap.active) draw();
+        });
+      }
       await reveal();
     },
     draw,

@@ -14,6 +14,7 @@ use serde::Serialize;
 use tauri::Manager;
 
 mod netmap;
+mod updater;
 
 /// Basic facts about the machine the app is running on.
 /// `Serialize` lets Tauri send this struct to JavaScript as JSON.
@@ -37,7 +38,12 @@ fn system_info() -> SystemInfo {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Auto-updates (see updater.rs and docs/UPDATES.md). Desktop only.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+
+    builder
         .setup(|app| {
             // Network Map keeps its memory (device names, approved networks) in the app data folder.
             app.manage(netmap::NetmapState::new(app.handle()));
@@ -51,6 +57,8 @@ pub fn run() {
             netmap::netmap_scan,
             netmap::netmap_set_label,
             netmap::netmap_set_known,
+            updater::update_check,
+            updater::update_install,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the app");

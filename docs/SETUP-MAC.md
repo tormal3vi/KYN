@@ -147,6 +147,10 @@ your Mac's hostname, because the Rust side isn't running.
 
 ## 9. (Optional) Build a real `.app`
 
+> For the version you actually keep in your Dock, use the release route in
+> **[UPDATES.md](UPDATES.md)** instead: GitHub builds it, and it updates
+> itself. The steps below make a one-off copy on your own Mac.
+
 ```bash
 npm run build
 ```

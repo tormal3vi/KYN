@@ -43,6 +43,7 @@ anything else aimed at people or devices you don't own.
 | 3 | Watchdog: ping your services, alert when one is down | planned |
 | 4 | Hack Sim: offline game, fake network, no real targets | later |
 | 5 | Hardware Link: ESP32 / Flipper Zero you own | later |
+| – | Installable app (Dock + icon) with signed auto-updates | **done**, see [docs/UPDATES.md](docs/UPDATES.md) |
 
 ## Run it
 
@@ -53,7 +54,8 @@ npm install         # once
 npm run dev         # the app, in a window (reloads when you edit src/)
 npm run boot:cli    # the same startup in your real terminal (text logo)
 npm run preview     # the UI in a normal browser, http://localhost:5173
-npm run build       # make KYN.app + .dmg
+npm run build       # make KYN.app + .dmg on this computer
+npm run release -- 0.2.0   # publish a new version (auto-update), see docs/UPDATES.md
 ```
 
 **Controls:** any key finishes the startup · `Esc` skips to the menu ·
@@ -90,7 +92,13 @@ and per device your name for it, whether you marked it known, first/last
 seen. New unknown devices are flagged with a red `!`.
 
 **Keys:** `←` `→` select · `tab` map/list · `r` rescan · `n` rename ·
-`k` known/unknown · `esc` back.
+`k` known/unknown · `esc` back. The mouse and scroll wheel work too.
+
+**Does it show everything?** Every device that is switched on and connected to
+the same network you are. There's no limit on how many: the map uses a second
+ring after 12, and the list scrolls ("↓ 4 more below"). Things that can hide
+a device: it's on a separate guest Wi-Fi, your router has "client isolation"
+switched on, or it was asleep and stayed silent (press `r` to scan again).
 
 In the browser preview there's no Rust, so it plays a demo network instead
 (labelled "demo data").
@@ -134,9 +142,11 @@ src/                     the UI: plain HTML/CSS/JS, no framework, no build step
   js/netmap/icons.js     device icons (12×12, mesh style like the logo)
   js/netmap/api.js       calls into Rust (or plays demo data in a browser)
   js/sysinfo.js          asks Rust for hostname/OS (browser fallback in preview)
+  js/updates.js          asks Rust whether a newer version exists, installs it
   js/main.js             startup → wait for a key → menu
 src-tauri/               the native app (Rust)
   src/lib.rs             Rust commands the UI can call
+  src/updater.rs         auto-updates: check, download, verify, install
   src/netmap/            the scanner: scope guard, sweep, ARP, Bonjour,
                          vendor lookup, device-type guessing, memory file
   data/oui.tsv           MAC prefix → manufacturer table (npm run update-oui)
@@ -147,6 +157,10 @@ src-tauri/               the native app (Rust)
 scripts/boot-cli.mjs     runs boot.js in a real terminal (ANSI escape codes)
 scripts/make-icon.mjs    draws the icon from logo.js
 scripts/update-oui.mjs   rebuilds the manufacturer table from the IEEE list
+scripts/setup-updates.mjs  one-time: create the update signing key
+scripts/release.mjs      bump the version, commit and tag a release
+.github/workflows/       release.yml: GitHub builds + publishes releases
+docs/UPDATES.md          how releases and auto-updates work
 scripts/serve.mjs        the `npm run preview` server
 design/app-icon.svg      icon source (generated)
 docs/SETUP-MAC.md        step-by-step Mac setup

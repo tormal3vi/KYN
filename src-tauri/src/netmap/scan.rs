@@ -1,11 +1,13 @@
-//! The scan itself. Four steps, about 5–8 seconds on a home network:
+//! The scan itself. Four steps, about 6–9 seconds on a home network:
 //!
 //! 1. Sweep: knock once on every address in your subnet (a tiny UDP packet and
 //!    a TCP connection attempt to port 80/443). Doing that makes your computer
 //!    ask "who has this address?" on the network (ARP), and every device
 //!    that's switched on answers with its MAC address, even if it ignores
 //!    the knock itself.
-//! 2. Read the computer's ARP table to get those IP → MAC answers.
+//! 2. Read the computer's ARP table to get those IP → MAC answers. Then knock
+//!    once more on the addresses that stayed silent (sleepy phones often only
+//!    answer the second time) and read the table again.
 //! 3. Meanwhile, listen for Bonjour announcements (mdns.rs).
 //! 4. Identify each device that answered: its name from your router (reverse
 //!    DNS) and a quick check of ~15 well-known ports that hint at what it is.
@@ -116,11 +118,26 @@ pub async fn run(
     // 2. ARP table (give late answers a moment to arrive first).
     tokio::time::sleep(Duration::from_millis(600)).await;
     let mut macs: HashMap<Ipv4Addr, [u8; 6]> = HashMap::new();
-    for e in arp::read_table().await {
-        if in_net(e.ip) && e.ip != t.ip {
-            macs.insert(e.ip, e.mac);
-            answered.insert(e.ip);
+    let read_arp = |macs: &mut HashMap<Ipv4Addr, [u8; 6]>, answered: &mut BTreeSet<Ipv4Addr>, entries: Vec<arp::Entry>| {
+        for e in entries {
+            if in_net(e.ip) && e.ip != t.ip {
+                macs.insert(e.ip, e.mac);
+                answered.insert(e.ip);
+            }
         }
+    };
+    read_arp(&mut macs, &mut answered, arp::read_table().await);
+
+    // Second chance: phones and tablets that were asleep often wake up on the
+    // first knock and only answer the next one. Knock again on the silent
+    // addresses (UDP only, instant), wait a moment, read the table again.
+    let silent: Vec<Ipv4Addr> = scope::hosts(t.ip, prefix, &[t.ip]).into_iter().filter(|ip| !answered.contains(ip)).collect();
+    if !silent.is_empty() {
+        for ip in &silent {
+            let _ = udp.send_to(&[0], (*ip, 9));
+        }
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+        read_arp(&mut macs, &mut answered, arp::read_table().await);
     }
     if let Some(gw) = t.gateway.filter(|g| in_net(*g)) {
         answered.insert(gw);

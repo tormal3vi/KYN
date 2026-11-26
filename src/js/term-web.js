@@ -263,6 +263,19 @@ export async function createWebTerminal(host, { minimums }) {
   });
   screen.addEventListener('click', (e) => hitAt(e)?.click?.());
 
+  // Mouse wheel / trackpad: one step per notch, throttled for trackpads.
+  const wheelHandlers = [];
+  let wheelAt = 0;
+  term.onWheel = (fn) => wheelHandlers.push(fn);
+  screen.addEventListener('wheel', (e) => {
+    if (!wheelHandlers.length || Math.abs(e.deltaY) < 4) return;
+    e.preventDefault();
+    const t = performance.now();
+    if (t - wheelAt < 90) return;
+    wheelAt = t;
+    wheelHandlers.forEach((fn) => fn(Math.sign(e.deltaY)));
+  }, { passive: false });
+
   // ── resizing ─────────────────────────────────────────────────────────────
   term.onResize = (fn) => resizeHandlers.push(fn);
   let timer;
