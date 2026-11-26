@@ -9,7 +9,7 @@
 export const APP = {
   name: 'KYN',
   tagline: 'KNOW YOUR NETWORK.',
-  version: '0.3.0',
+  version: '0.4.0',
   command: 'kyn', // shown in the fake shell prompt: "$ kyn netmap"
 };
 
