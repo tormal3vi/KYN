@@ -8,6 +8,7 @@
 
 import { APP, MODULES, STATUS } from './config.js';
 import { revealScreen } from './fx.js';
+import { createNetmap } from './netmap/screen.js';
 
 const X = 3; // left margin, same as the boot log
 
@@ -46,12 +47,17 @@ export function createMenu(term, info) {
     : 'browser preview · native core not running';
 
   // ── painting (into `t`: the real terminal, or a recorder during reveals) ──
-  function paintHeader(t) {
+  /** "[ KYN ] _", the tagline and the clock: shared by every screen. */
+  function paintTop(t) {
     const word = `[ ${APP.name} ]`;
     t.write(X, 1, word, 'strong');
     t.cursor(X + word.length + 1, 1);
     t.write(X + 2, 2, APP.tagline, 'muted');
     t.write(t.cols - X - 8, 1, clock(), 'gray');
+  }
+
+  function paintHeader(t) {
+    paintTop(t);
     t.write(X, 4, '[+] host  ', 'gray');
     t.write(X + 10, 4, fit(hostLine, t.cols - X * 2 - 10), 'text');
     t.write(X, 5, '[+] scope ', 'gray');
@@ -130,6 +136,7 @@ export function createMenu(term, info) {
 
   /** Redraw instantly (navigation, resize). */
   function draw() {
+    if (netmap.active) { netmap.draw(); return; }
     token++;
     term.clear();
     paint(term);
@@ -146,6 +153,11 @@ export function createMenu(term, info) {
 
   function openModule(i) {
     index = i;
+    if (MODULES[i].id === 'netmap' && MODULES[i].status === 'ready') {
+      token++; // stop any running reveal
+      netmap.open();
+      return;
+    }
     open = i;
     reveal();
   }
@@ -156,6 +168,7 @@ export function createMenu(term, info) {
   }
 
   function handleKey(e) {
+    if (netmap.active) { netmap.handleKey(e); return; }
     const k = e.key;
     if (open >= 0) {
       if (k === 'Escape' || k === 'Backspace') { e.preventDefault(); closeModule(); }
@@ -170,6 +183,12 @@ export function createMenu(term, info) {
     else if (k === 'Enter' || k === ' ') { e.preventDefault(); openModule(index); }
     else if (/^[1-9]$/.test(k) && Number(k) <= MODULES.length) { e.preventDefault(); openModule(Number(k) - 1); }
   }
+
+  const netmap = createNetmap(term, {
+    paintHeader: paintTop,
+    onExit: () => reveal(),
+    calm: !animate,
+  });
 
   setInterval(() => {
     if (!visible) return;

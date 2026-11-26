@@ -8,7 +8,7 @@
 
 export const APP = {
   name: 'KYN',
-  tagline: 'DECENTRALIZED BY NATURE.',
+  tagline: 'KNOW YOUR NETWORK.',
   version: '0.1.0',
   command: 'kyn', // shown in the fake shell prompt: "$ kyn netmap"
 };
@@ -30,7 +30,7 @@ export const MODULES = [
     id: 'netmap',
     cmd: 'netmap',
     name: 'Network Map',
-    status: 'next',
+    status: 'ready',
     blurb: 'Scan your own local network: every device with IP, MAC, vendor, online or not.',
     plan: [
       'Detect your subnet automatically (for example 192.168.1.0/24)',
@@ -44,7 +44,7 @@ export const MODULES = [
     id: 'portaudit',
     cmd: 'portaudit',
     name: 'Port Audit',
-    status: 'planned',
+    status: 'next',
     blurb: 'Open ports on your own machines, with the risky ones explained in plain language.',
     plan: [
       'Scan common ports on a machine you pick from your Network Map',
@@ -91,7 +91,7 @@ export const MODULES = [
 ];
 
 export const STATUS = {
-  ready: { label: 'online', style: 'strong' },
+  ready: { label: 'ready', style: 'strong' },
   next: { label: 'next', style: 'text' },
   planned: { label: 'planned', style: 'gray' },
   locked: { label: 'locked', style: 'faint' },

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Extra macOS settings, merged into the app's Info.plist when it is built.
+  macOS asks your permission before an app talks to devices on your local
+  network; this is the explanation shown in that prompt.
+-->
+<plist version="1.0">
+<dict>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>KYN looks for the devices on your own network to draw the Network Map.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_airplay._tcp</string>
+    <string>_raop._tcp</string>
+    <string>_companion-link._tcp</string>
+    <string>_apple-mobdev2._tcp</string>
+    <string>_googlecast._tcp</string>
+    <string>_androidtvremote2._tcp</string>
+    <string>_amzn-wplay._tcp</string>
+    <string>_spotify-connect._tcp</string>
+    <string>_sonos._tcp</string>
+    <string>_ipp._tcp</string>
+    <string>_printer._tcp</string>
+    <string>_pdl-datastream._tcp</string>
+    <string>_hap._tcp</string>
+    <string>_hue._tcp</string>
+    <string>_matter._tcp</string>
+    <string>_esphomelib._tcp</string>
+    <string>_arduino._tcp</string>
+    <string>_smb._tcp</string>
+    <string>_afpovertcp._tcp</string>
+    <string>_ssh._tcp</string>
+    <string>_workstation._tcp</string>
+    <string>_http._tcp</string>
+  </array>
+</dict>
+</plist>

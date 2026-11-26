@@ -224,17 +224,22 @@ export async function createWebTerminal(host, { minimums }) {
         tone[i] = t;
         changed = true;
       },
+      clear() {
+        glyph.fill(' ');
+        changed = true;
+      },
       flush() {
-        if (!changed) return;
+        if (!changed || !canvas.isConnected) return;
         changed = false;
         ctx.clearRect(0, 0, pxW, pxH);
-        for (let t = 0; t < colors.length; t++) {
+        // one pass to bucket lit cells by brightness, then one colour at a time
+        const buckets = colors.map(() => []);
+        for (let i = 0; i < glyph.length; i++) if (glyph[i] !== ' ') buckets[tone[i]]?.push(i);
+        buckets.forEach((cells, t) => {
+          if (!cells.length) return;
           ctx.fillStyle = colors[t];
-          for (let i = 0; i < glyph.length; i++) {
-            if (tone[i] !== t || glyph[i] === ' ') continue;
-            drawGlyph(ctx, glyph[i], (i % cols) * cw, Math.floor(i / cols) * ch, cw, ch);
-          }
-        }
+          for (const i of cells) drawGlyph(ctx, glyph[i], (i % cols) * cw, Math.floor(i / cols) * ch, cw, ch);
+        });
       },
     };
   };

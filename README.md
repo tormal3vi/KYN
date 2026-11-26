@@ -7,7 +7,7 @@
 [+] Connection successful.
 
 [ KYN ] _
-  DECENTRALIZED BY NATURE.
+  KNOW YOUR NETWORK.
 ```
 
 A desktop security toolkit for **your own devices and your own network**. It
@@ -38,8 +38,8 @@ anything else aimed at people or devices you don't own.
 | # | Module | Status |
 | --- | --- | --- |
 | – | Startup → logo → module menu | **done** |
-| 1 | Network Map: devices on your LAN (IP, MAC, vendor, online) | next |
-| 2 | Port Audit: open ports on your machines, risky ones explained | planned |
+| 1 | Network Map: devices on your LAN, with icons, names, vendor, online/offline | **done** |
+| 2 | Port Audit: open ports on your machines, risky ones explained | next |
 | 3 | Watchdog: ping your services, alert when one is down | planned |
 | 4 | Hack Sim: offline game, fake network, no real targets | later |
 | 5 | Hardware Link: ESP32 / Flipper Zero you own | later |
@@ -58,6 +58,42 @@ npm run build       # make KYN.app + .dmg
 
 **Controls:** any key finishes the startup · `Esc` skips to the menu ·
 `↑` `↓` select · `Enter` open · `1`–`5` jump · `Esc` back.
+
+## Network Map
+
+Open it from the menu (`1`). The first time KYN sees a network it asks you to
+confirm it's yours; it remembers that per network.
+
+**What a scan does** (`src-tauri/src/netmap/scan.rs`, about 5–8 seconds):
+
+1. Knocks once on every address in your subnet (a tiny UDP packet and a TCP
+   connection attempt to port 80/443). That makes your computer ask the
+   network "who has this address?", and every switched-on device answers.
+2. Reads your computer's ARP table: the list of IP → MAC addresses it just
+   learned (`arp -a`, no admin rights needed).
+3. Listens for Bonjour/mDNS announcements: names like "Living Room" and
+   models like `AppleTV11,1`.
+4. For each device: asks your router for its name (reverse DNS), checks ~15
+   well-known ports that hint at what it is, and looks up the maker from the
+   MAC address in a bundled table (`src-tauri/data/oui.tsv`, works offline).
+
+A small rule set (`classify.rs`) turns those clues into a device type and
+icon, and keeps the reason ("announces model MacBookPro18,3") to show you.
+
+**Scope guard** (`scope.rs`): only private ranges (10.x, 172.16–31.x,
+192.168.x), only the network you're connected to, never more than the 254
+addresses around you. Public ranges are refused.
+
+**What it remembers** (`netmap.json` in the app data folder, on a Mac
+`~/Library/Application Support/com.kyn.desktop/`): networks you approved,
+and per device your name for it, whether you marked it known, first/last
+seen. New unknown devices are flagged with a red `!`.
+
+**Keys:** `←` `→` select · `tab` map/list · `r` rescan · `n` rename ·
+`k` known/unknown · `esc` back.
+
+In the browser preview there's no Rust, so it plays a demo network instead
+(labelled "demo data").
 
 ## Design rules
 
@@ -94,15 +130,23 @@ src/                     the UI: plain HTML/CSS/JS, no framework, no build step
   js/fx.js               character effects: decode, scramble, screen reveal
   js/term-web.js         draws that terminal program inside the window
   js/menu.js             the module menu, on the same grid
+  js/netmap/screen.js    Network Map: map + list views, detail panel, keys
+  js/netmap/icons.js     device icons (12×12, mesh style like the logo)
+  js/netmap/api.js       calls into Rust (or plays demo data in a browser)
   js/sysinfo.js          asks Rust for hostname/OS (browser fallback in preview)
   js/main.js             startup → wait for a key → menu
 src-tauri/               the native app (Rust)
-  src/lib.rs             Rust commands the UI can call (now: system_info)
+  src/lib.rs             Rust commands the UI can call
+  src/netmap/            the scanner: scope guard, sweep, ARP, Bonjour,
+                         vendor lookup, device-type guessing, memory file
+  data/oui.tsv           MAC prefix → manufacturer table (npm run update-oui)
+  Info.plist             macOS: why KYN asks for local-network access
   tauri.conf.json        window size, app name, icons, security policy
   capabilities/          what the UI is allowed to ask the system for
   icons/                 generated app icons (npm run icon)
 scripts/boot-cli.mjs     runs boot.js in a real terminal (ANSI escape codes)
 scripts/make-icon.mjs    draws the icon from logo.js
+scripts/update-oui.mjs   rebuilds the manufacturer table from the IEEE list
 scripts/serve.mjs        the `npm run preview` server
 design/app-icon.svg      icon source (generated)
 docs/SETUP-MAC.md        step-by-step Mac setup

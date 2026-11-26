@@ -114,6 +114,13 @@ running; it's the app's log.
 
 In the app: any key finishes the startup, `Esc` skips straight to the menu.
 
+**Network Map and the "local network" permission.** The first time you open
+Network Map and confirm your network, macOS may ask whether *Terminal* (in dev
+mode the request comes from Terminal; for the built app it says *KYN*) may
+"find and connect to devices on your local network". Click **Allow**. If you
+clicked Don't Allow by accident: System Settings → Privacy & Security →
+Local Network, and switch it on there.
+
 ## 7. (Optional) The same startup in Terminal
 
 KYN's startup is written as a terminal program, so you can also run it in

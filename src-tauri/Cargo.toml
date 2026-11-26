@@ -18,3 +18,9 @@ tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 gethostname = "1"
+# Network Map
+netdev = "0.48"          # network interfaces, subnet, default gateway
+mdns-sd = "0.22"         # Bonjour / mDNS: names and device types
+dns-lookup = "4"         # reverse DNS (IP -> name) via your router
+futures = "0.3"
+tokio = { version = "1", features = ["net", "time", "sync", "macros", "rt", "process"] }

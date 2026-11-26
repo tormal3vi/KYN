@@ -10,9 +10,11 @@
     "preview": "node scripts/serve.mjs",
     "boot:cli": "node scripts/boot-cli.mjs",
     "icon": "node scripts/make-icon.mjs && tauri icon design/app-icon.svg",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "update-oui": "npm update oui-data && node scripts/update-oui.mjs"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2"
+    "@tauri-apps/cli": "^2",
+    "oui-data": "^2.1.67"
   }
 }
