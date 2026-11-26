@@ -93,6 +93,12 @@ Watch it on GitHub: the repository's **Actions** tab shows the build (about
    paid Apple developer certificate. Go to **System Settings → Privacy &
    Security**, scroll down, and click **Open Anyway** next to the KYN message.
    You only do this once.
+   - If macOS instead says KYN **"is damaged and can't be opened"** (v0.2.0
+     did this; later versions are sealed with a free "ad-hoc" signature), run
+     this once in Terminal, then open it again:
+     `xattr -cr /Applications/KYN.app`
+     It removes the "downloaded from the internet" mark. Only do this for apps
+     you trust, like your own.
 4. To keep it in the Dock: while it's open, right-click its Dock icon →
    **Options → Keep in Dock**.
 
@@ -109,6 +115,7 @@ update next time you open it. Press `u` in the menu.
 | `npm run release` says "uncommitted changes" | Commit (or undo) your changes first, so the release contains exactly what you expect. |
 | KYN never shows an update | Only installed copies update (not `npm run dev`). The new version's number must be higher, and its Actions build must have finished. |
 | "update failed: ... signature" | The release was signed with a different key than the one inside your installed app. Reinstall from the latest `.dmg` once. |
+| macOS says KYN "is damaged and can't be opened" | `xattr -cr /Applications/KYN.app` in Terminal, then open it again (see step 3). |
 | Windows says "Windows protected your PC" | Same reason as the macOS warning: click **More info → Run anyway**. |
 
 ## The files involved
