@@ -25,8 +25,8 @@ KYN is a defensive, learning tool. Every feature works only on hardware and
 networks you own.
 
 **In scope:** mapping devices on your own LAN, auditing ports on your own
-machines, watching services you run, an offline hacking-*simulator* game, and
-a front-end for hardware you own (ESP32, Flipper Zero).
+machines, seeing what your own computer is connecting to, watching services
+you run, and a front-end for hardware you own (ESP32, Flipper Zero).
 
 **Out of scope, and not to be added:** intercepting other people's traffic,
 Wi-Fi deauthentication or jamming, viewing other people's cameras, sending
@@ -39,9 +39,9 @@ anything else aimed at people or devices you don't own.
 | --- | --- | --- |
 | – | Startup → logo → module menu | **done** |
 | 1 | Network Map: devices on your LAN, with icons, names, vendor, online/offline | **done** |
-| 2 | Port Audit: open ports on your machines, risky ones explained | next |
-| 3 | Watchdog: ping your services, alert when one is down | planned |
-| 4 | Hack Sim: offline game, fake network, no real targets | later |
+| 2 | Port Audit: open ports on your machines, risky ones explained | **done** |
+| 3 | Traffic Monitor: what this Mac connects to; how busy each device is | next (scope being agreed) |
+| 4 | Watchdog: ping your services, alert when one is down | planned |
 | 5 | Hardware Link: ESP32 / Flipper Zero you own | later |
 | – | Installable app (Dock + icon) with signed auto-updates | **done**, see [docs/UPDATES.md](docs/UPDATES.md) |
 
@@ -103,6 +103,32 @@ switched on, or it was asleep and stayed silent (press `r` to scan again).
 In the browser preview there's no Rust, so it plays a demo network instead
 (labelled "demo data").
 
+## Port Audit
+
+Open it from the menu (`2`), or press `p` on a device in Network Map.
+
+Pick a device, then `enter` for a **quick check** (the ~140 ports in
+`src/js/portaudit/knowledge.js`, a few seconds) or `f` for a **full check**
+(all 65,535, a minute or two; `esc` stops it). A check is just knocking: a
+normal connection attempt to each port, closed again straight away. Nothing
+is sent and nothing is logged in to.
+
+Every open port is listed riskiest first (`high` in red, then `medium`,
+`low`, `info`) with what it is, why it matters and how to close it, with Mac
+steps where they apply.
+
+**This computer** gets extra detail from the operating system (`lsof` on a
+Mac): which app owns each port, whether other devices can reach it or it only
+listens on this computer ("local"), and whether the firewall is on. macOS
+only shows the names of system services to admins, so those appear as
+"a system service".
+
+**Scope:** this computer, or devices on the network you confirmed in Network
+Map. Anything else is refused (`src-tauri/src/portaudit/mod.rs`).
+
+**Keys:** `↑` `↓` select · `r` check again · `f` full check · `t` pick
+another device · `esc` back.
+
 ## Design rules
 
 The look comes from the KYN reference artwork:
@@ -141,6 +167,9 @@ src/                     the UI: plain HTML/CSS/JS, no framework, no build step
   js/netmap/screen.js    Network Map: map + list views, detail panel, keys
   js/netmap/icons.js     device icons (12×12, mesh style like the logo)
   js/netmap/api.js       calls into Rust (or plays demo data in a browser)
+  js/portaudit/screen.js Port Audit: device picker, results, explanations
+  js/portaudit/knowledge.js  what each port is, risk level, how to fix it
+  js/portaudit/api.js    calls into Rust (or plays demo data in a browser)
   js/sysinfo.js          asks Rust for hostname/OS (browser fallback in preview)
   js/updates.js          asks Rust whether a newer version exists, installs it
   js/main.js             startup → wait for a key → menu
@@ -149,6 +178,8 @@ src-tauri/               the native app (Rust)
   src/updater.rs         auto-updates: check, download, verify, install
   src/netmap/            the scanner: scope guard, sweep, ARP, Bonjour,
                          vendor lookup, device-type guessing, memory file
+  src/portaudit/         port checks (scoped to your devices) and the
+                         "which app listens where" report for this computer
   data/oui.tsv           MAC prefix → manufacturer table (npm run update-oui)
   Info.plist             macOS: why KYN asks for local-network access
   tauri.conf.json        window size, app name, icons, security policy

@@ -14,6 +14,7 @@ use serde::Serialize;
 use tauri::Manager;
 
 mod netmap;
+mod portaudit;
 mod updater;
 
 /// Basic facts about the machine the app is running on.
@@ -47,6 +48,7 @@ pub fn run() {
         .setup(|app| {
             // Network Map keeps its memory (device names, approved networks) in the app data folder.
             app.manage(netmap::NetmapState::new(app.handle()));
+            app.manage(portaudit::PortauditState::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -57,6 +59,9 @@ pub fn run() {
             netmap::netmap_scan,
             netmap::netmap_set_label,
             netmap::netmap_set_known,
+            portaudit::portaudit_scan,
+            portaudit::portaudit_cancel,
+            portaudit::portaudit_local,
             updater::update_check,
             updater::update_install,
         ])

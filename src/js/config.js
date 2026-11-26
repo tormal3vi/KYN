@@ -44,12 +44,24 @@ export const MODULES = [
     id: 'portaudit',
     cmd: 'portaudit',
     name: 'Port Audit',
-    status: 'next',
+    status: 'ready',
     blurb: 'Open ports on your own machines, with the risky ones explained in plain language.',
     plan: [
       'Scan common ports on a machine you pick from your Network Map',
       'Explain what each open port is, in plain language',
       'Flag risky ones (Telnet, SMB, exposed databases, remote desktop) and say how to close them',
+    ],
+  },
+  {
+    id: 'traffic',
+    cmd: 'traffic',
+    name: 'Traffic Monitor',
+    status: 'next',
+    blurb: 'Which apps on this Mac are talking to the internet, and how busy each device on your network is.',
+    plan: [
+      'Live list of connections from this computer: which app, to where, how much data',
+      'Activity levels for the other devices on your network',
+      'Exact scope to be agreed before it is built',
     ],
   },
   {
@@ -62,18 +74,6 @@ export const MODULES = [
       'Add your own services: a website URL or a host and port',
       'Check them on a timer and keep a short uptime history',
       'Full-screen alert when something you run stops answering',
-    ],
-  },
-  {
-    id: 'sim',
-    cmd: 'sim',
-    name: 'Hack Sim',
-    status: 'locked',
-    blurb: 'Offline game: a made-up network with simulated scans. No real targets.',
-    plan: [
-      'A fictional city network that exists only inside the app',
-      'Simulated scans and exploits: no real packets ever leave your machine',
-      'Crack-the-node minigames with timers and trace meters',
     ],
   },
   {

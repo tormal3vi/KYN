@@ -9,6 +9,7 @@
 import { APP, MODULES, STATUS } from './config.js';
 import { revealScreen } from './fx.js';
 import { createNetmap } from './netmap/screen.js';
+import { createPortaudit } from './portaudit/screen.js';
 import { checkForUpdate, installUpdate } from './updates.js';
 
 const X = 3; // left margin, same as the boot log
@@ -104,11 +105,11 @@ export function createMenu(term, info) {
     try {
       await installUpdate((p) => {
         update = p.installing ? { state: 'installing', version } : { state: 'downloading', version, ...p };
-        if (!netmap.active) draw();
+        if (!inModule()) draw();
       });
     } catch (e) {
       update = { state: 'failed', message: String(e?.message || e) };
-      if (!netmap.active) draw();
+      if (!inModule()) draw();
     }
   }
 
@@ -185,6 +186,7 @@ export function createMenu(term, info) {
   /** Redraw instantly (navigation, resize). */
   function draw() {
     if (netmap.active) { netmap.draw(); return; }
+    if (portaudit.active) { portaudit.draw(); return; }
     token++;
     term.clear();
     paint(term);
@@ -206,6 +208,11 @@ export function createMenu(term, info) {
       netmap.open();
       return;
     }
+    if (MODULES[i].id === 'portaudit' && MODULES[i].status === 'ready') {
+      token++;
+      portaudit.open({ from: 'menu' });
+      return;
+    }
     open = i;
     reveal();
   }
@@ -217,6 +224,7 @@ export function createMenu(term, info) {
 
   function handleKey(e) {
     if (netmap.active) { netmap.handleKey(e); return; }
+    if (portaudit.active) { portaudit.handleKey(e); return; }
     const k = e.key;
     if (open >= 0) {
       if (k === 'Escape' || k === 'Backspace') { e.preventDefault(); closeModule(); }
@@ -233,9 +241,18 @@ export function createMenu(term, info) {
     else if (/^[1-9]$/.test(k) && Number(k) <= MODULES.length) { e.preventDefault(); openModule(Number(k) - 1); }
   }
 
+  const inModule = () => netmap.active || portaudit.active;
+
+  const portaudit = createPortaudit(term, {
+    paintHeader: paintTop,
+    // opened from Network Map (p) → back to the map; from the menu → menu
+    onExit: (from) => (from === 'netmap' ? netmap.resume() : reveal()),
+  });
+
   const netmap = createNetmap(term, {
     paintHeader: paintTop,
     onExit: () => reveal(),
+    onAudit: (device, net) => portaudit.open({ from: 'netmap', target: device, net }),
     calm: !animate,
   });
 
@@ -255,7 +272,7 @@ export function createMenu(term, info) {
         checkForUpdate().then((s) => {
           if (s?.state !== 'available') return;
           update = s;
-          if (visible && !netmap.active) draw();
+          if (visible && !inModule()) draw();
         });
       }
       await reveal();

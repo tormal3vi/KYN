@@ -13,7 +13,7 @@ mod classify;
 mod mdns;
 mod oui;
 mod scan;
-mod scope;
+pub(crate) mod scope;
 mod store;
 
 use std::net::Ipv4Addr;
@@ -218,6 +218,12 @@ fn offline(id: &str, s: &Saved) -> Device {
 
 fn sort(devices: &mut [Device]) {
     devices.sort_by_key(|d| (!d.online, d.ip.parse::<Ipv4Addr>().map(u32::from).unwrap_or(u32::MAX)));
+}
+
+/// The network this computer is on right now (used by Port Audit's scope check).
+pub(crate) fn current_network(state: &NetmapState) -> Result<NetworkInfo, String> {
+    let store = state.store.lock().map_err(|e| e.to_string())?;
+    detect(&store).map(|(info, _)| info)
 }
 
 #[tauri::command]

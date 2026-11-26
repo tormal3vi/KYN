@@ -43,7 +43,7 @@ const CITY = /^(beijing|shenzhen|guangzhou|guangdong|hangzhou|shanghai|zhejiang|
 const brand = (vendor) => vendor.replace(CITY, '').split(/[\s,]+/)[0];
 
 /** Best human name for a device: your label, else a cleaned-up announced name. */
-function nameOf(d) {
+export function nameOf(d) {
   if (d.label) return d.label;
   if (d.isSelf) return 'this computer';
   const n = (d.names || []).find((x) => !/^\d+\.\d+\.\d+\.\d+$/.test(x));
@@ -63,7 +63,7 @@ function wrap(text, width) {
   return out;
 }
 
-export function createNetmap(term, { paintHeader, onExit, calm = false }) {
+export function createNetmap(term, { paintHeader, onExit, onAudit, calm = false }) {
   let active = false;
   let net = null;
   let error = null;
@@ -184,6 +184,22 @@ export function createNetmap(term, { paintHeader, onExit, calm = false }) {
     active = false;
     layer = null;
     onExit();
+  }
+
+  /** Hand the screen to Port Audit for the selected device; resume() comes back. */
+  function audit() {
+    const d = selected();
+    if (!d || !onAudit || !net?.approved) return;
+    active = false;
+    layer = null;
+    onAudit(d, net);
+  }
+
+  function resume() {
+    active = true;
+    mode = 'normal';
+    draw();
+    if (!looping) loop();
   }
 
   // ── layout ──────────────────────────────────────────────────────────────
@@ -349,7 +365,7 @@ export function createNetmap(term, { paintHeader, onExit, calm = false }) {
       ? 'y this is my network · esc back'
       : mode === 'detail'
         ? 'esc / enter close'
-        : `←→ select   tab ${view === 'map' ? 'list' : 'map'}   r rescan   n rename   k known   esc back`;
+        : `←→ select   tab ${view === 'map' ? 'list' : 'map'}   p ports   r rescan   n rename   k known   esc back`;
     term.write(X, y, keys, 'faint');
   }
 
@@ -575,6 +591,7 @@ export function createNetmap(term, { paintHeader, onExit, calm = false }) {
         if (selected()) { e.preventDefault(); mode = 'rename'; input = selected().label || ''; draw(); }
         break;
       case 'k': case 'K': e.preventDefault(); toggleKnown(); break;
+      case 'p': case 'P': e.preventDefault(); audit(); break;
       case 'Enter': if (!geo?.wide && selected()) { e.preventDefault(); mode = 'detail'; draw(); } break;
       case 'Escape': case 'Backspace': e.preventDefault(); exit(); break;
       default: break;
@@ -588,5 +605,5 @@ export function createNetmap(term, { paintHeader, onExit, calm = false }) {
     if (to !== selIndex()) select(to);
   });
 
-  return { open, draw, handleKey, get active() { return active; } };
+  return { open, resume, draw, handleKey, get active() { return active; } };
 }
