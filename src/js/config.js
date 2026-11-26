@@ -56,12 +56,12 @@ export const MODULES = [
     id: 'traffic',
     cmd: 'traffic',
     name: 'Traffic Monitor',
-    status: 'next',
-    blurb: 'Which apps on this Mac are talking to the internet, and how busy each device on your network is.',
+    status: 'ready',
+    blurb: 'Which apps on this computer talk to which servers, how much data, and roughly where in the world.',
     plan: [
-      'Live list of connections from this computer: which app, to where, how much data',
-      'Activity levels for the other devices on your network',
-      'Exact scope to be agreed before it is built',
+      'Live list of the apps on this computer that are online, with how much data each sends and receives',
+      'For each server: its owner, its country and city, and whether the connection is encrypted',
+      'A world map that zooms in only as far as the location data really knows',
     ],
   },
   {

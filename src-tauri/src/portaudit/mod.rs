@@ -15,7 +15,7 @@
 //! Scope: only this computer, or devices on the network you approved in
 //! Network Map. Anything else is refused.
 
-mod local;
+pub(crate) mod local;
 
 use std::net::Ipv4Addr;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};

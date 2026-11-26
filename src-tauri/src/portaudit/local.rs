@@ -30,7 +30,7 @@ fn is_loopback(addr: &str) -> bool {
 }
 
 /// Split "127.0.0.1:631", "*:7000", "[::1]:631", "[fe80::1%lo0]:5353" into (address, port).
-pub fn split_endpoint(s: &str) -> Option<(String, u16)> {
+pub(crate) fn split_endpoint(s: &str) -> Option<(String, u16)> {
     let (addr, port) = s.rsplit_once(':')?;
     let port = port.trim().parse().ok()?;
     let addr = addr.trim_start_matches('[').trim_end_matches(']');

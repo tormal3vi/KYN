@@ -10,6 +10,7 @@ import { APP, MODULES, STATUS } from './config.js';
 import { revealScreen } from './fx.js';
 import { createNetmap } from './netmap/screen.js';
 import { createPortaudit } from './portaudit/screen.js';
+import { createTraffic } from './traffic/screen.js';
 import { checkForUpdate, installUpdate } from './updates.js';
 
 const X = 3; // left margin, same as the boot log
@@ -187,6 +188,7 @@ export function createMenu(term, info) {
   function draw() {
     if (netmap.active) { netmap.draw(); return; }
     if (portaudit.active) { portaudit.draw(); return; }
+    if (traffic.active) { traffic.draw(); return; }
     token++;
     term.clear();
     paint(term);
@@ -213,6 +215,11 @@ export function createMenu(term, info) {
       portaudit.open({ from: 'menu' });
       return;
     }
+    if (MODULES[i].id === 'traffic' && MODULES[i].status === 'ready') {
+      token++;
+      traffic.open();
+      return;
+    }
     open = i;
     reveal();
   }
@@ -225,6 +232,7 @@ export function createMenu(term, info) {
   function handleKey(e) {
     if (netmap.active) { netmap.handleKey(e); return; }
     if (portaudit.active) { portaudit.handleKey(e); return; }
+    if (traffic.active) { traffic.handleKey(e); return; }
     const k = e.key;
     if (open >= 0) {
       if (k === 'Escape' || k === 'Backspace') { e.preventDefault(); closeModule(); }
@@ -241,13 +249,15 @@ export function createMenu(term, info) {
     else if (/^[1-9]$/.test(k) && Number(k) <= MODULES.length) { e.preventDefault(); openModule(Number(k) - 1); }
   }
 
-  const inModule = () => netmap.active || portaudit.active;
+  const inModule = () => netmap.active || portaudit.active || traffic.active;
 
   const portaudit = createPortaudit(term, {
     paintHeader: paintTop,
     // opened from Network Map (p) → back to the map; from the menu → menu
     onExit: (from) => (from === 'netmap' ? netmap.resume() : reveal()),
   });
+
+  const traffic = createTraffic(term, { paintHeader: paintTop, onExit: () => reveal() });
 
   const netmap = createNetmap(term, {
     paintHeader: paintTop,

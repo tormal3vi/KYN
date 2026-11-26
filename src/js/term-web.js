@@ -211,7 +211,8 @@ export async function createWebTerminal(host, { minimums }) {
     const ch = pxH / rows;
     const glyph = new Array(cols * rows).fill(' ');
     const tone = new Uint8Array(cols * rows);
-    const colors = TONES.map((name) => COLORS[name].hex);
+    // tones 0–4 as in palette.js, plus 5 = the red accent (the map's marker)
+    const colors = [...TONES.map((name) => COLORS[name].hex), COLORS.red.hex];
     let changed = false;
     return {
       cols,

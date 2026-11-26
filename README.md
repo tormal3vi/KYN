@@ -40,7 +40,7 @@ anything else aimed at people or devices you don't own.
 | – | Startup → logo → module menu | **done** |
 | 1 | Network Map: devices on your LAN, with icons, names, vendor, online/offline | **done** |
 | 2 | Port Audit: open ports on your machines, risky ones explained | **done** |
-| 3 | Traffic Monitor: what this Mac connects to; how busy each device is | next (scope being agreed) |
+| 3 | Traffic Monitor: which app on this computer talks to which server, how much, and where in the world | **done** |
 | 4 | Watchdog: ping your services, alert when one is down | planned |
 | 5 | Hardware Link: ESP32 / Flipper Zero you own | later |
 | – | Installable app (Dock + icon) with signed auto-updates | **done**, see [docs/UPDATES.md](docs/UPDATES.md) |
@@ -129,6 +129,50 @@ Map. Anything else is refused (`src-tauri/src/portaudit/mod.rs`).
 **Keys:** `↑` `↓` select · `r` check again · `f` full check · `t` pick
 another device · `esc` back.
 
+## Traffic Monitor
+
+Open it from the menu (`3`). It lists every app on this computer that is
+online right now: how many servers it talks to, how fast data is moving
+(`↓` in, `↑` out), how much it used since it started, and which countries
+its servers are in. `enter` shows one app's servers: where each one is, who
+owns it, its name, and whether the connection is encrypted (unencrypted ones
+are marked red with a `!`).
+
+**The map.** Picking a server flies the world map to it, and it stops where
+the location data stops knowing:
+
+- **city level**: a circle of about 50 km around the city. The map never
+  zooms in closer than that. An IP address is not a street address.
+- **region level**: a circle of about 200 km.
+- **country level**: the whole country lights up, with no point at all.
+  Big cloud and video providers (Google, Apple, Amazon...) often only say
+  "somewhere in the US".
+- **unknown**: the world. Some global networks (Cloudflare) are everywhere.
+
+**Where the places come from.** The first time, press `d` to download the
+free location database once (about 37 MB): GeoLite2 City by MaxMind for
+places, and the RouteViews + DB-IP ASN database for owners, packaged as
+[@ip-location-db](https://github.com/sapics/ip-location-db) on npm. KYN
+checks the download against npm's published SHA-512 fingerprint and keeps it
+in its own app-data folder. From then on every lookup happens on this
+computer: no address you connect to is sent anywhere. Server names come from
+your normal DNS (the same thing your browser already asked).
+
+This product includes GeoLite2 Data created by MaxMind, available from
+[maxmind.com](https://www.maxmind.com) (CC BY-SA 4.0). Owner data: RouteViews
+and DB-IP (CC BY 4.0). Map outlines: Natural Earth (public domain), via
+world-atlas (see `src/data/NOTICE.md`). The GeoLite2 licence forbids using it
+to find a specific household or person, and KYN doesn't.
+
+**What it reads.** Only this computer's own list of connections (`lsof`, and
+`nettop` for data amounts on a Mac: the same numbers Activity Monitor shows).
+Nothing is captured, no connection's contents are read, and nothing looks at
+other devices' traffic. On Windows and Linux the data amounts need admin
+rights, so those columns stay empty there.
+
+**Keys:** `↑` `↓` select · `enter` servers · `d` download places · `space`
+pause · `esc` back.
+
 ## Design rules
 
 The look comes from the KYN reference artwork:
@@ -170,6 +214,11 @@ src/                     the UI: plain HTML/CSS/JS, no framework, no build step
   js/portaudit/screen.js Port Audit: device picker, results, explanations
   js/portaudit/knowledge.js  what each port is, risk level, how to fix it
   js/portaudit/api.js    calls into Rust (or plays demo data in a browser)
+  js/traffic/screen.js   Traffic Monitor: apps, servers, keys
+  js/traffic/worldmap.js the zooming world map (dots on the fine grid)
+  js/traffic/model.js    apps from raw connections, speeds, port names
+  js/traffic/api.js      calls into Rust (or plays demo data in a browser)
+  data/countries-50m.json  world map outlines (Natural Earth)
   js/sysinfo.js          asks Rust for hostname/OS (browser fallback in preview)
   js/updates.js          asks Rust whether a newer version exists, installs it
   js/main.js             startup → wait for a key → menu
@@ -180,6 +229,8 @@ src-tauri/               the native app (Rust)
                          vendor lookup, device-type guessing, memory file
   src/portaudit/         port checks (scoped to your devices) and the
                          "which app listens where" report for this computer
+  src/traffic/           this computer's connections and data per app, and
+                         the offline place / owner lookup
   data/oui.tsv           MAC prefix → manufacturer table (npm run update-oui)
   Info.plist             macOS: why KYN asks for local-network access
   tauri.conf.json        window size, app name, icons, security policy

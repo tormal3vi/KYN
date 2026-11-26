@@ -3,8 +3,9 @@
 //! How the app is split:
 //! - The web UI in `../src` (HTML/CSS/JS) draws everything you see.
 //! - This Rust side does what a web page is not allowed to do on its own:
-//!   reading basic system info, and scanning *your own* local network for the
-//!   Network Map module (see netmap/).
+//!   reading basic system info, scanning *your own* local network (netmap/),
+//!   checking your own devices' open ports (portaudit/), and listing which
+//!   apps on this computer talk to where (traffic/).
 //!
 //! JavaScript calls a Rust function with `invoke("function_name")`. The
 //! function must be marked `#[tauri::command]` and listed in
@@ -15,6 +16,7 @@ use tauri::Manager;
 
 mod netmap;
 mod portaudit;
+mod traffic;
 mod updater;
 
 /// Basic facts about the machine the app is running on.
@@ -49,6 +51,8 @@ pub fn run() {
             // Network Map keeps its memory (device names, approved networks) in the app data folder.
             app.manage(netmap::NetmapState::new(app.handle()));
             app.manage(portaudit::PortauditState::default());
+            // Traffic Monitor keeps the downloaded location database there too.
+            app.manage(traffic::TrafficState::new(app.handle()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -62,6 +66,10 @@ pub fn run() {
             portaudit::portaudit_scan,
             portaudit::portaudit_cancel,
             portaudit::portaudit_local,
+            traffic::traffic_snapshot,
+            traffic::traffic_geo_status,
+            traffic::traffic_geo_download,
+            traffic::traffic_geo_lookup,
             updater::update_check,
             updater::update_install,
         ])
